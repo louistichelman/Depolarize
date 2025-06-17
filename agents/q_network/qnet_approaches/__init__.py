@@ -1,0 +1,1 @@
+from .approaches import QNET_REGISTRY
