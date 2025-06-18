@@ -17,7 +17,7 @@ class GlobalGNN(BaseArchitecture):
     def prepare_batch(self, raw_states):
         data_list = []
         for state in raw_states: 
-            G, sigma, tau, l = state
+            G, sigma, tau, l, _ = state
 
             data = from_networkx(G)
             n_nodes = data.num_nodes

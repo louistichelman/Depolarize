@@ -17,7 +17,7 @@ class Graphormer(BaseArchitecture):
         influences = []
 
         for state in raw_states:
-            G, sigma, tau, l = state
+            G, sigma, tau, l, _ = state
             n_nodes = G.number_of_nodes()
 
             # Node features

@@ -18,43 +18,43 @@ class FJDepolarize:
         sigma = np.random.choice([-1, 1], size=self.n)
         while len(np.unique(sigma)) < 2:
             sigma = np.random.choice([-1, 1], size=self.n)
+        polarization = self.polarization(G, sigma)
 
-        self.current_state = (G, sigma, None, self.k)
+        self.current_state = (G, sigma, None, self.k, polarization)
         return self.current_state
     
     def is_terminal(self, state = None):
         """Returns True if the state is terminal, False otherwise."""
         if state is None:
             state = self.current_state
-        _, _, _, l = state
+        _, _, _, l, _ = state
         return l == 0
     
     def step(self, action, state = None):
         """Returns the reward given action and state, aswell as resulting next state"""
         if state is None:
             state = self.current_state
-        G, sigma, tau, l = state
+        G, sigma, tau, l, polarization_old = state
         if l == 0:
             raise ValueError("Cannot take step in terminal state")
         terminal = False
         if tau is None:
-            self.current_state = (G, sigma, action, l)
+            self.current_state = (G, sigma, action, l, polarization_old)
             return self.current_state, 0, terminal
         else:
             if l-1 == 0:
                 terminal = True
             u, v = tau, action
             if u == v:
-                self.current_state = (G, sigma, None, l-1)
+                self.current_state = (G, sigma, None, l-1, polarization_old)
                 return self.current_state, 0, terminal
-            polarization_old = self.polarization(G, sigma)
             G_new = G.copy()
             if G_new.has_edge(u, v):
                 G_new.remove_edge(u, v)
             else:
                 G_new.add_edge(u, v)
             polarization_new = self.polarization(G_new, sigma)
-            self.current_state = (G_new, sigma, None, l-1)
+            self.current_state = (G_new, sigma, None, l-1, polarization_new)
             return self.current_state, polarization_old-polarization_new, terminal
     
     def polarization(self, G, sigma):
