@@ -5,3 +5,4 @@ experiments_dp.ipynb
 experiments_dqn.ipynb
 old
 .DS_Store
+logdir
