@@ -4,6 +4,7 @@ import torch.optim as optim
 from collections import deque
 import random
 import wandb
+import string
 from .q_network.gnn_architectures import ARCHITECTURE_REGISTRY
 from .q_network.qnet_approaches import QNET_REGISTRY
 
@@ -12,21 +13,21 @@ class DQN:
     def __init__(self, 
                  env, 
                  model_architecture: str,      #has to be in ARCHITECTURE_REGISTRY
-                 qnet_approach: str,          #has to be in QNET_REGISTRY
-                 embed_dim: int, 
+                 qnet_approach: str,           #has to be in QNET_REGISTRY
+                 embed_dim: int,
                  **kwargs):
 
         # Extract from kwargs with fallback defaults
         self.device = kwargs.get("device", torch.device("cuda" if torch.cuda.is_available() else "cpu"))
-        learning_rate = kwargs.get("learning_rate", 1e-4)
-        self.number_of_layers = kwargs.get("number_of_layers", 4)
+        learning_rate = kwargs.get("learning_rate", 0.0008)
+        number_of_layers = kwargs.get("number_of_layers", 4)
+        num_heads = kwargs.get("num_heads", 3)
         self.gamma = kwargs.get("gamma", 1.0)
         self.batch_size = kwargs.get("batch_size", 40)
         self.train_freq = kwargs.get("train_freq", 4)
         self.target_update_freq = kwargs.get("target_update_freq", 1000)
         self.timesteps_train = kwargs.get("timesteps_train", 100000)
         self.wandb_init = kwargs.get("wandb_init", True)
-        wand_run_name = kwargs.get("wand_run_name", "dqn-run-no-name")
         self.start_e = kwargs.get("start_e", 1.0)
         self.end_e = kwargs.get("end_e", 1.0)
         self.exploration_fraction = kwargs.get("exploration_fraction", 0.1)
@@ -50,12 +51,15 @@ class DQN:
         self.global_step = 0
 
         if self.wandb_init:
+            random_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5)) # to ensure a unique run_name
+            self.run_name = kwargs.get("run_name", f"{model_architecture}-{qnet_approach}-n{env.n}-k{env.k}-hd{embed_dim}-heads{num_heads}-lr{learning_rate}-layers{number_of_layers}-bs{self.batch_size}-{random_code}")
             wandb.init(
             project="Depolarize",
-            name=wand_run_name,
+            name=self.run_name,
             entity="louistichelman",
             config={
-                "architecture": str(self.q_network.__class__.__name__),
+                "architecture": model_architecture,
+                "qnet_approach": qnet_approach,
                 "embed_dim": embed_dim,
                 "lr": self.optimizer.param_groups[0]['lr'],
                 "batch_size": self.batch_size,

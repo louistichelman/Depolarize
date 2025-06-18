@@ -19,6 +19,7 @@ class ComplexQNetwork(BaseQNetwork):
 
         self.linear_with_tau = torch.nn.Linear(4 * embed_dim, embed_dim)
         self.projection_with_tau = torch.nn.Linear(embed_dim, 1)
+        self.to(self.device)
 
     def compute_q_values(self, node_embeddings, raw_states, batch):
         graph_emb = self.set2set(node_embeddings, batch)

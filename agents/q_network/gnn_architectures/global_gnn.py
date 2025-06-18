@@ -12,6 +12,7 @@ class GlobalGNN(BaseArchitecture):
         super().__init__(embed_dim, **kwargs)
         self.input_layer = GlobalConv(in_channels=3, hidden_channels=embed_dim)
         self.layers = nn.ModuleList([GlobalConv(in_channels=embed_dim, hidden_channels=embed_dim) for _ in range(number_of_layers)])
+        self.to(self.device)
 
     def prepare_batch(self, raw_states):
         data_list = []

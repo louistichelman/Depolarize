@@ -1,5 +1,5 @@
-/.DS_Store
-/__pycache__
-/experiment.ipynb
-/old
-/wandb
+wandb
+**/__pycache__/
+*.pyc
+experiments_dp.ipynb
+experiments_dqn.ipynb
