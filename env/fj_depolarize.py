@@ -4,7 +4,7 @@ from torch_geometric.utils import from_networkx
 
 
 class FJDepolarize:
-    def __init__(self, n, k=2, max_edges = None):
+    def __init__(self, n, k=2, max_edges = None, **kwargs):
         self.n = n
         self.k = k
         self.max_edges = max_edges# + self.k if max_edges is not None else n * (n - 1) // 2 
