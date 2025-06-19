@@ -14,7 +14,6 @@ class DQN:
                  env, 
                  model_architecture: str,      #has to be in ARCHITECTURE_REGISTRY
                  qnet_approach: str,           #has to be in QNET_REGISTRY
-                 embed_dim: int,
                  **kwargs):
 
         # Extract from kwargs with fallback defaults
@@ -35,8 +34,8 @@ class DQN:
         model_class = ARCHITECTURE_REGISTRY[model_architecture]
         qnet_class = QNET_REGISTRY[qnet_approach]
 
-        model_q = model_class(embed_dim = embed_dim, graph_size_training = env.n, **kwargs) # Create two identical models for q and target networks
-        model_target = model_class(embed_dim = embed_dim, graph_size_training = env.n, **kwargs)
+        model_q = model_class(graph_size_training = env.n, **kwargs) # Create two identical models for q and target networks
+        model_target = model_class(raph_size_training = env.n, **kwargs)
 
         self.q_network = qnet_class(model_q)
         self.target_network = qnet_class(model_target)
@@ -50,6 +49,7 @@ class DQN:
 
         if self.wandb_init:
             random_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5)) # to ensure a unique run_name
+            embed_dim = kwargs.get("num_heads", "_default")
             num_layers = len(model_q.layers)
             num_heads = kwargs.get("num_heads", "_default")
             self.run_name = kwargs.get("run_name", f"{model_architecture}-{qnet_approach}-n{env.n}-k{env.k}-hd{embed_dim}-layers{num_layers}-lr{learning_rate}-heads{num_heads}-bs{self.batch_size}-{random_code}")

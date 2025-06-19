@@ -2,14 +2,17 @@ from env.fj_depolarize import FJDepolarize
 from agents.dqn import DQN
 import torch
 import torch.profiler
+import os
+import json
 
 
 
-def run_training(n_nodes, k_steps, architecture, approach, embed_dim, **kwargs):
+
+def run_training(params, timesteps_train):
     
-    env = FJDepolarize(n=n_nodes, k=k_steps) # initialize environment
+    env = FJDepolarize(**params) # initialize environment
 
-    agent = DQN(env, model_architecture=architecture, qnet_approach=approach, embed_dim=embed_dim, **kwargs)   
+    agent = DQN(env = env, timesteps_train = timesteps_train, **params)   
 
     # with torch.profiler.profile(
     #     schedule=torch.profiler.schedule(
@@ -28,19 +31,58 @@ def run_training(n_nodes, k_steps, architecture, approach, embed_dim, **kwargs):
     agent.train()
 
     if agent.run_name:
-        torch.save(agent.q_network.state_dict(), f"saved files/dqn_params/{agent.run_name}_q_network_params.pth")
-        torch.save(agent.target_network.state_dict(), f"saved files/dqn_params/{agent.run_name}_target_network_params.pth")
-    
-    
-if __name__ == "__main__":
-    run_training(n_nodes=10, 
-                k_steps=4, 
-                architecture = "global",
-                approach = "simple", 
-                timesteps_train = 100000,
-                embed_dim = 64,
-                num_layers = 4,
-                run_name = "cluster_test")                 # possible further arguments: num_heads, number_of_layers, learning_rate,...
+        # Define run-specific folder
+        run_dir = os.path.join("saved files", "dqn", "saved_runs_dqn", agent.run_name)
+        os.makedirs(run_dir, exist_ok=True)
+
+        # Save full parameter dict
+        with open(os.path.join(run_dir, "params.json"), "w") as f:
+            json.dump(params, f, indent=4)
+
+        # Save model parameters
+        torch.save(agent.q_network.state_dict(), os.path.join(run_dir, "q_network_params.pth"))
+        torch.save(agent.target_network.state_dict(), os.path.join(run_dir, "target_network_params.pth"))
+
+
+def continue_training(run_name, timesteps_train):
+    run_dir = os.path.join("saved files", "dqn", "saved_runs_dqn", run_name)
+
+    # --- Load saved parameters ---
+    with open(os.path.join(run_dir, "params.json"), "r") as f:
+        params = json.load(f)
+
+    # --- Initialize environment and agent ---
+    env = FJDepolarize(**params)
+    agent = DQN(env = env, timesteps_train=timesteps_train, **params)
+
+    # --- Load model weights ---
+    q_net_path = os.path.join(run_dir, "q_network_params.pth")
+    target_net_path = os.path.join(run_dir, "target_network_params.pth")
+
+    agent.q_network.load_state_dict(torch.load(q_net_path, map_location=torch.device("cpu")))
+    agent.target_network.load_state_dict(torch.load(target_net_path, map_location=torch.device("cpu")))
+
+    # --- Resume training ---
+    agent.train()
+
+    # Save model parameters
+    torch.save(agent.q_network.state_dict(), q_net_path)
+    torch.save(agent.target_network.state_dict(), target_net_path)
 
     
+if __name__ == "__main__":
+    params = {"n": 10,
+              "k": 4, 
+              "model_architecture":  "GraphSage",
+              "qnet_approach": "simple", 
+              "learning_rate": 0.0008,
+              "embed_dim": 64,
+              "num_layers": 3,
+              "wandb_init": True, # if false the run will also not be saved
+              "run_name": "test_graphsage_simple"}
+    
+    
+    # run_training(params, timesteps_train= 100000)                 
+
+    continue_training(timesteps_train = 20000, run_name="test_graphsage_simple") 
 
