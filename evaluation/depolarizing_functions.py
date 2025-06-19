@@ -30,7 +30,7 @@ def optimal_edge_to_add_remove(G, sigma, polarization_measure):
         for j in range(i + 1, len(nodes)):
             u, v = nodes[i], nodes[j]
             if not G.has_edge(u, v):
-                G.add_edge(u, v, weight=1.0)
+                G.add_edge(u, v)
                 polarization = polarization_measure(G = G, sigma = sigma)
                 if polarization < min_polarization:
                     min_polarization = polarization
@@ -42,7 +42,7 @@ def optimal_edge_to_add_remove(G, sigma, polarization_measure):
                 if polarization < min_polarization:
                     min_polarization = polarization
                     best_edge = (u, v)
-                G.add_edge(u, v, weight=1.0) # Restore the original graph
+                G.add_edge(u, v) # Restore the original graph
     return best_edge
 
 def depolarize_policy(state, env, policy):
@@ -78,11 +78,11 @@ def depolarize_random(state, env):
 
 
 def depolarize_optimal(state, env):
-    if isinstance(state, tuple):
-        G, sigma, _, _ = state
-    else:
-        G, sigma, _, _ = env.states[state]
     k = env.k
+    if isinstance(state, int):
+        G, sigma, _, _ = env.states[state]
+    else:
+        G, sigma = state["graph"], state["sigma"]
     min_polarization = float('inf')
     best_G = None
 

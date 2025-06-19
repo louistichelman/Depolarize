@@ -1,0 +1,11 @@
+{
+    "n": 10,
+    "k": 4,
+    "model_architecture": "GraphSage",
+    "qnet_approach": "simple",
+    "learning_rate": 0.0008,
+    "embed_dim": 64,
+    "num_layers": 3,
+    "wandb_init": true,
+    "run_name": "test_graphsage_simple"
+}
