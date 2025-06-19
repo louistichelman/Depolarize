@@ -6,10 +6,10 @@ from torch_geometric.nn import SAGEConv
 from torch_geometric.utils import from_networkx
 
 class GraphSAGE(BaseArchitecture):
-    def __init__(self, embed_dim=60, number_of_layers = 3, **kwargs):
+    def __init__(self, embed_dim=64, num_layers = 4, **kwargs):
         super().__init__(embed_dim, **kwargs)
         self.input_layer = SAGEConv(3, embed_dim)
-        self.layers = torch.nn.ModuleList([SAGEConv(embed_dim, embed_dim) for _ in range(number_of_layers)])
+        self.layers = torch.nn.ModuleList([SAGEConv(embed_dim, embed_dim) for _ in range(num_layers)])
 
     def prepare_batch(self, raw_states):
         data_list = []

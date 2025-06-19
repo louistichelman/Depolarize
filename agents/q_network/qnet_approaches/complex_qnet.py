@@ -25,7 +25,7 @@ class ComplexQNetwork(BaseQNetwork):
         graph_emb = self.set2set(node_embeddings, batch)
         graph_emb = graph_emb[batch] # broadcast to [N, embed_dim]
 
-        taus = [s[2] if s[2] is not None else -1 for s in raw_states]  # Use -1 as placeholder for None
+        taus = [state["tau"] if state["tau"] is not None else -1 for state in raw_states]  # Use -1 as placeholder for None
         mask_state_has_tau = torch.tensor([t != -1 for t in taus], dtype=torch.bool, device=self.device) # compute mask for states with tau
         mask_state_has_tau_per_node = mask_state_has_tau[batch]  # broadcast to [N]
         taus = torch.tensor([t if t != -1 else 0 for t in taus], dtype=torch.long, device=self.device) # replace -1 with 0 so every state has a tau

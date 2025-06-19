@@ -20,8 +20,6 @@ class DQN:
         # Extract from kwargs with fallback defaults
         self.device = kwargs.get("device", torch.device("cuda" if torch.cuda.is_available() else "cpu"))
         learning_rate = kwargs.get("learning_rate", 0.0008)
-        number_of_layers = kwargs.get("number_of_layers", 4)
-        num_heads = kwargs.get("num_heads", 3)
         self.gamma = kwargs.get("gamma", 1.0)
         self.batch_size = kwargs.get("batch_size", 40)
         self.train_freq = kwargs.get("train_freq", 4)
@@ -37,8 +35,8 @@ class DQN:
         model_class = ARCHITECTURE_REGISTRY[model_architecture]
         qnet_class = QNET_REGISTRY[qnet_approach]
 
-        model_q = model_class(embed_dim = embed_dim, **kwargs) # Create two identical models for q and target networks
-        model_target = model_class(embed_dim = embed_dim, **kwargs)
+        model_q = model_class(embed_dim = embed_dim, graph_size_training = env.n, **kwargs) # Create two identical models for q and target networks
+        model_target = model_class(embed_dim = embed_dim, graph_size_training = env.n, **kwargs)
 
         self.q_network = qnet_class(model_q)
         self.target_network = qnet_class(model_target)
@@ -52,7 +50,9 @@ class DQN:
 
         if self.wandb_init:
             random_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5)) # to ensure a unique run_name
-            self.run_name = kwargs.get("run_name", f"{model_architecture}-{qnet_approach}-n{env.n}-k{env.k}-hd{embed_dim}-heads{num_heads}-lr{learning_rate}-layers{number_of_layers}-bs{self.batch_size}-{random_code}")
+            num_layers = len(model_q.layers)
+            num_heads = kwargs.get("num_heads", "_default")
+            self.run_name = kwargs.get("run_name", f"{model_architecture}-{qnet_approach}-n{env.n}-k{env.k}-hd{embed_dim}-layers{num_layers}-lr{learning_rate}-heads{num_heads}-bs{self.batch_size}-{random_code}")
             wandb.init(
             project="Depolarize",
             name=self.run_name,
@@ -110,7 +110,7 @@ class DQN:
         slope = (end_e - start_e) / duration
         return max(slope * t + start_e, end_e)
     
-    def train(self):
+    def train(self, profiler = None):
         state = self.env.reset()
         loss_window = deque(maxlen=100)
         for step in range(1, self.timesteps_train + 1):
@@ -136,6 +136,8 @@ class DQN:
                 loss_window.append(loss.item())
                 if self.wandb_init:
                     wandb.log({"step": self.global_step, "loss": loss.item(), "epsilon": epsilon})
+                if profiler is not None:
+                    profiler.step()
                 
             if step % self.target_update_freq == 0:
                 self.target_network.load_state_dict(self.q_network.state_dict())

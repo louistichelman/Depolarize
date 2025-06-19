@@ -7,10 +7,10 @@ import networkx as nx
 import numpy as np
 
 class Graphormer(BaseArchitecture):
-    def __init__(self, embed_dim=60, number_of_layers = 3, num_heads = 4, **kwargs):
+    def __init__(self, embed_dim=64, num_layers = 3, num_heads = 4, **kwargs):
         super().__init__(embed_dim, **kwargs)
         self.input_proj = nn.Linear(in_features=3, out_features=embed_dim)
-        self.layers = nn.ModuleList([GraphormerLayer(embed_dim, num_heads) for _ in range(number_of_layers)])
+        self.layers = nn.ModuleList([GraphormerLayer(embed_dim, num_heads) for _ in range(num_layers)])
 
     def prepare_batch(self, raw_states):
         xs = []

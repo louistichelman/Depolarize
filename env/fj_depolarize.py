@@ -1,9 +1,7 @@
 import numpy as np
-import itertools
 import networkx as nx
-import igraph as ig
-from tqdm import tqdm
-from collections import defaultdict
+from torch_geometric.utils import from_networkx
+
 
 class FJDepolarize:
     def __init__(self, n, k=2, max_edges = None):
@@ -18,48 +16,60 @@ class FJDepolarize:
         sigma = np.random.choice([-1, 1], size=self.n)
         while len(np.unique(sigma)) < 2:
             sigma = np.random.choice([-1, 1], size=self.n)
-        polarization = self.polarization(G, sigma)
+        polarization, influence_matrix = self.polarization(G, sigma, return_influence_matrix=True)
 
-        self.current_state = (G, sigma, None, self.k, polarization)
-        return self.current_state
+        self.current_state = {"graph": G, 
+                              "sigma": sigma, 
+                              "tau": None, 
+                              "edges_left": self.k, 
+                              "polarization": polarization, 
+                              "influence_matrix": influence_matrix,
+                              "graph_data": from_networkx(G)}
+        return self.current_state.copy()
     
     def is_terminal(self, state = None):
         """Returns True if the state is terminal, False otherwise."""
-        if state is None:
-            state = self.current_state
-        _, _, _, l, _ = state
-        return l == 0
+        if state is not None:
+            self.current_state = state
+        return state["edges_left"] == 0
     
     def step(self, action, state = None):
         """Returns the reward given action and state, aswell as resulting next state"""
-        if state is None:
-            state = self.current_state
-        G, sigma, tau, l, polarization_old = state
-        if l == 0:
+        if state is not None:
+            self.current_state = state
+
+        if self.current_state["edges_left"] == 0:
             raise ValueError("Cannot take step in terminal state")
+        
         terminal = False
-        if tau is None:
-            self.current_state = (G, sigma, action, l, polarization_old)
-            return self.current_state, 0, terminal
+        
+        if self.current_state["tau"] is None:
+            self.current_state["tau"] = action
+            return self.current_state.copy(), 0, terminal
         else:
-            if l-1 == 0:
+            self.current_state["edges_left"] -= 1
+            if self.current_state["edges_left"] == 0:
                 terminal = True
-            u, v = tau, action
+            u, v = self.current_state["tau"], action
+            self.current_state["tau"] = None
             if u == v:
-                self.current_state = (G, sigma, None, l-1, polarization_old)
-                return self.current_state, 0, terminal
-            G_new = G.copy()
+                return self.current_state.copy(), 0, terminal
+            G_new = self.current_state["graph"].copy()
             if G_new.has_edge(u, v):
                 G_new.remove_edge(u, v)
             else:
                 G_new.add_edge(u, v)
-            polarization_new = self.polarization(G_new, sigma)
-            self.current_state = (G_new, sigma, None, l-1, polarization_new)
-            return self.current_state, polarization_old-polarization_new, terminal
+            polarization_old = self.current_state["polarization"]
+            self.current_state["polarization"], self.current_state["influence_matrix"] = self.polarization(G_new, self.current_state["sigma"], return_influence_matrix=True)
+            self.current_state["graph"], self.current_state["graph_data"] = G_new, from_networkx(G_new)
+            return self.current_state.copy(), polarization_old-self.current_state["polarization"], terminal
     
-    def polarization(self, G, sigma):
+    def polarization(self, G, sigma, return_influence_matrix = False):
         """Returns the polarization of a network."""
         L = nx.laplacian_matrix(G).toarray()
         I = np.eye(L.shape[0])
-        final_opinions = np.linalg.inv(I + L).dot(np.array(sigma))
-        return np.linalg.norm(final_opinions)
+        influence_matrix = np.linalg.inv(I + L)
+        polarization = np.linalg.norm(influence_matrix.dot(np.array(sigma)))
+        if return_influence_matrix:
+            return polarization, influence_matrix
+        return polarization
