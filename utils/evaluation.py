@@ -3,10 +3,10 @@ import random
 
 def depolarize_greedy(state, env):
     k = env.k
-    if isinstance(state, tuple):
-        G, sigma, _, _ = state
-    else:
+    if isinstance(state, int):
         G, sigma, _, _ = env.states[state]
+    else:
+        G, sigma = state["graph"], state["sigma"]
     G_greedy = G.copy()
     for _ in range(k):
         best_edge = optimal_edge_to_add_remove(G_greedy, sigma, env.polarization)
@@ -53,14 +53,18 @@ def depolarize_policy(state, env, policy):
         if terminal:
             break
     if isinstance(state, int):
-        state = env.states[state]
-    G_policy, sigma, _, _ = state
+        G_policy, sigma, _, _ = env.states[state]
+    else:
+        G_policy, sigma = state["graph"], state["sigma"]
     polarization = env.polarization(G = G_policy, sigma = sigma)
     return G_policy, polarization
 
 def depolarize_random(state, env):
     k = env.k
-    G, sigma, _, _ = state
+    if isinstance(state, int):
+        G, sigma, _, _ = env.states[state]
+    else:
+        G, sigma = state["graph"], state["sigma"]
     G_random = G.copy()
     for _ in range(k):
         nodes = list(G_random.nodes())
