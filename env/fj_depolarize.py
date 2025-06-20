@@ -38,6 +38,7 @@ class FJDepolarize:
         if state is not None:
             self.current_state = state
 
+        self.current_state = self.current_state.copy()
         if self.current_state["edges_left"] == 0:
             raise ValueError("Cannot take step in terminal state")
         
@@ -45,7 +46,7 @@ class FJDepolarize:
         
         if self.current_state["tau"] is None:
             self.current_state["tau"] = action
-            return self.current_state.copy(), 0, terminal
+            return self.current_state, 0, terminal
         else:
             self.current_state["edges_left"] -= 1
             if self.current_state["edges_left"] == 0:
@@ -53,7 +54,7 @@ class FJDepolarize:
             u, v = self.current_state["tau"], action
             self.current_state["tau"] = None
             if u == v:
-                return self.current_state.copy(), 0, terminal
+                return self.current_state, 0, terminal
             G_new = self.current_state["graph"].copy()
             if G_new.has_edge(u, v):
                 G_new.remove_edge(u, v)
@@ -62,7 +63,7 @@ class FJDepolarize:
             polarization_old = self.current_state["polarization"]
             self.current_state["polarization"], self.current_state["influence_matrix"] = self.polarization(G_new, self.current_state["sigma"], return_influence_matrix=True)
             self.current_state["graph"], self.current_state["graph_data"] = G_new, from_networkx(G_new)
-            return self.current_state.copy(), polarization_old-self.current_state["polarization"], terminal
+            return self.current_state, polarization_old-self.current_state["polarization"], terminal
     
     def polarization(self, G, sigma, return_influence_matrix = False):
         """Returns the polarization of a network."""

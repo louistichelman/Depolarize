@@ -49,7 +49,7 @@ class DQN:
 
         if self.wandb_init:
             random_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5)) # to ensure a unique run_name
-            embed_dim = kwargs.get("num_heads", "_default")
+            embed_dim = kwargs.get("embed_dim", "_default")
             num_layers = len(model_q.layers)
             num_heads = kwargs.get("num_heads", "_default")
             self.run_name = kwargs.get("run_name", f"{model_architecture}-{qnet_approach}-n{env.n}-k{env.k}-hd{embed_dim}-layers{num_layers}-lr{learning_rate}-heads{num_heads}-bs{self.batch_size}-{random_code}")
