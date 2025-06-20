@@ -2,7 +2,7 @@ import os
 import pickle
 from env.fj_depolarize import FJDepolarize
 from env.fj_depolarize_simple import DepolarizeSimple
-from depolarizing_functions import depolarize_greedy, depolarize_policy
+from evaluation.depolarizing_functions import depolarize_greedy, depolarize_policy
 from tqdm import tqdm
 from agents.dqn import DQN
 import json
@@ -13,7 +13,7 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 
-def generate_random_states(n_values, num_states=500, filename = "test_states", save_path="../saved files/dqn/greedy_comparison"):
+def generate_random_states(n_values, num_states=500, filename = "test_states", save_path="saved files/dqn/greedy_comparison"):
     os.makedirs(save_path, exist_ok=True)
     all_states = {}
 
@@ -41,7 +41,7 @@ def generate_random_states(n_values, num_states=500, filename = "test_states", s
 
     return all_states
 
-def compute_greedy_polarizations(k_values, test_states, filename = "greedy_polarizations", save_path="../saved files/dqn/greedy_comparison"):
+def compute_greedy_polarizations(k_values, test_states, filename = "greedy_polarizations", save_path="saved files/dqn/greedy_comparison"):
     os.makedirs(save_path, exist_ok=True)
     results = {}
 
@@ -61,8 +61,8 @@ def compute_greedy_polarizations(k_values, test_states, filename = "greedy_polar
 
 def compare_dqn_greedy(run_name, filename_test_states = "test_states_19.06", filename_greedy_polarizatios = "greedy_polarizations_19.06"):
 
-    run_dir = os.path.join("..", "saved files", "dqn", "saved_runs_dqn", run_name)
-    comparison_dir = os.path.join("..", "saved files", "dqn", "greedy_comparison")
+    run_dir = os.path.join("saved files", "dqn", "saved_runs_dqn", run_name)
+    comparison_dir = os.path.join("saved files", "dqn", "greedy_comparison")
 
     with open(os.path.join(comparison_dir, f"{filename_test_states}.pkl"), "rb") as f:
             test_states = pickle.load(f)
@@ -108,13 +108,14 @@ def compare_dqn_greedy(run_name, filename_test_states = "test_states_19.06", fil
                             "greedy_better": greedy_better,
                             "difference": polarization_diff}
 
+    print("end of comparison")
     with open(os.path.join(run_dir, f"greedy_comparison_results.pkl"), "wb") as f:
         pickle.dump(results, f)
     
 
 def visualize_comparison(run_name):
      
-    run_dir = os.path.join("..", "saved files", "dqn", "saved_runs_dqn", run_name)
+    run_dir = os.path.join("saved files", "dqn", "saved_runs_dqn", run_name)
 
     with open(os.path.join(run_dir, "params.json"), "r") as f:
             params = json.load(f)
@@ -176,6 +177,7 @@ def visualize_comparison(run_name):
     plt.title(f"Heatmap of DQN-Agent trained on n={n_target} and k={k_target} vs. Greedy")
     plt.tight_layout()
 
+    print("saving pic")
     # Save the figure to the specified path
     save_path = os.path.join(run_dir, "heatmap_dqn_vs_greedy.png")
     plt.savefig(save_path)

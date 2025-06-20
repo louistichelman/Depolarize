@@ -42,6 +42,8 @@ def run_training(params, timesteps_train):
         torch.save(agent.q_network.state_dict(), os.path.join(run_dir, "q_network_params.pth"))
         torch.save(agent.target_network.state_dict(), os.path.join(run_dir, "target_network_params.pth"))
 
+        return agent.run_name
+
 
 def continue_training(run_name, timesteps_train):
     run_dir = os.path.join("saved files", "dqn", "saved_runs_dqn", run_name)
@@ -73,22 +75,23 @@ def generate_test_states_and_greedy_polarizations(n_values, k_values, filename_t
     compute_greedy_polarizations(k_values=k_values, test_states = test_states, filename=filename_greedy_polarization)
 
 def evaluate_run(run_name, filename_test_states, filename_greedy_polarization):
+    print("infunction")
     compare_dqn_greedy(run_name=run_name, filename_test_states=filename_test_states, filename_greedy_polarizatios=filename_greedy_polarization)
     visualize_comparison(run_name)
     
 if __name__ == "__main__":
     # TRAINING
-    # params = {"n": 10,
-    #           "k": 4, 
-    #           "model_architecture":  "GraphSage",
-    #           "qnet_approach": "simple", 
-    #           "learning_rate": 0.0008,
-    #           "embed_dim": 64,
-    #           "num_layers": 3,
-    #           "wandb_init": True, # if false the run will also not be saved
-    #           "run_name": "test_graphsage_simple"}
+    params = {"n": 12,
+              "k": 4, 
+              "model_architecture":  "global",
+              "qnet_approach": "simple", 
+              "learning_rate": 0.0008,
+              "embed_dim": 64,
+              "num_layers": 4,
+              "wandb_init": True
+              }
     
-    # run_training(params, timesteps_train= 100000)                 
+    run_name = run_training(params, timesteps_train= 100000)                 
     # continue_training(timesteps_train = 20000, run_name="test_graphsage_simple") 
 
     # EVALUATION
@@ -98,5 +101,5 @@ if __name__ == "__main__":
     filename_greedy_polarization = "greedy_polarizations_19.06"
 
     # generate_test_states_and_greedy_polarizations(n_values, k_values, filename_test_states, filename_greedy_polarization)
-    evaluate_run(run_name="test_graphsage_simple", filename_test_states=filename_test_states, filename_greedy_polarization=filename_greedy_polarization)
+    evaluate_run(run_name, filename_test_states=filename_test_states, filename_greedy_polarization=filename_greedy_polarization)
 

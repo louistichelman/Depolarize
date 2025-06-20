@@ -35,7 +35,7 @@ class DQN:
         qnet_class = QNET_REGISTRY[qnet_approach]
 
         model_q = model_class(graph_size_training = env.n, **kwargs) # Create two identical models for q and target networks
-        model_target = model_class(raph_size_training = env.n, **kwargs)
+        model_target = model_class(graph_size_training = env.n, **kwargs)
 
         self.q_network = qnet_class(model_q)
         self.target_network = qnet_class(model_target)
