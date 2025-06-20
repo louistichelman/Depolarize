@@ -2,88 +2,216 @@ import os
 import pickle
 from env.fj_depolarize import FJDepolarize
 from env.fj_depolarize_simple import DepolarizeSimple
-from depolarizing_functions import depolarize_greedy
-from concurrent.futures import ProcessPoolExecutor, as_completed
-import pickle
-import os
+from depolarizing_functions import depolarize_greedy, depolarize_policy
+from tqdm import tqdm
+from agents.dqn import DQN
+import json
+import torch
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import seaborn as sns
+import numpy as np
+import pandas as pd
 
-def generate_random_states(ns, ks, num_states=500, save_path="saved files/dqn/greedy_comparison"):
+def generate_random_states(n_values, num_states=500, filename = "test_states", save_path="../saved files/dqn/greedy_comparison"):
     os.makedirs(save_path, exist_ok=True)
     all_states = {}
-    print("halleo")
 
-    for n in ns:
-        for k in ks:
-            env = FJDepolarize(n=n, k=k)
-            env_simple = DepolarizeSimple(n=n, k=k)
-            states = []
-            seen = set()
-            while len(states)<500:
-                state = env.reset()
-                state_hash = env_simple.state_hash(state["graph"], state["sigma"], state["tau"])
-                if state_hash in seen:
-                    if three_times:
-                        break
-                    if two_times:
-                        three_times = True
-                    if one_times:
-                        two_times = True
-                    one_times = True
-                    continue
-                one_times = two_times = three_times = False
-                seen.add(state_hash)
-                states.append(state)
-            all_states[(n, k)] = states
+    for n in n_values:
+        env = FJDepolarize(n=n, k=1)
+        env_simple = DepolarizeSimple(n=n, k=1, generate_states=False)
+        states = []
+        seen = set()
+        no_new_graphs = 0
+        while len(states)<num_states:
+            state = env.reset()
+            state_hash = env_simple.state_hash(state["graph"], state["sigma"], state["tau"])
+            if state_hash in seen:
+                if no_new_graphs>10:
+                    break
+                no_new_graphs += 1
+                continue
+            no_new_graphs = 0
+            seen.add(state_hash)
+            states.append(state)
+        all_states[n] = states
 
-    with open(os.path.join(save_path, "test_states.pkl"), "wb") as f:
+    with open(os.path.join(save_path, f"{filename}.pkl"), "wb") as f:
         pickle.dump(all_states, f)
 
     return all_states
 
-def compute_greedy_polarizations(state_dict, save_path="saved files/dqn/greedy_comparison"):
+def compute_greedy_polarizations(k_values, test_states, filename = "greedy_polarizations", save_path="../saved files/dqn/greedy_comparison"):
     os.makedirs(save_path, exist_ok=True)
     results = {}
 
-    for (n, k), states in state_dict.items():
+    for n, states in tqdm(test_states.items()):
+        for k in k_values:
+            env = FJDepolarize(n=n, k=k)
+            polarizations = []
+            for state in states:
+                _, pol = depolarize_greedy(state, env)
+                polarizations.append(pol)
+            results[(n, k)] = polarizations
+
+    with open(os.path.join(save_path, f"{filename}.pkl"), "wb") as f:
+        pickle.dump(results, f)
+
+    return results
+
+def compare_dqn_greedy(run_name, filename_test_states = "test_states_19.06", filename_greedy_polarizatios = "greedy_polarizations_19.06"):
+
+    run_dir = os.path.join("..", "saved files", "dqn", "saved_runs_dqn", run_name)
+    comparison_dir = os.path.join("..", "saved files", "dqn", "greedy_comparison")
+
+    with open(os.path.join(comparison_dir, f"{filename_test_states}.pkl"), "rb") as f:
+            test_states = pickle.load(f)
+
+    with open(os.path.join(comparison_dir, f"{filename_greedy_polarizatios}.pkl"), "rb") as f:
+            greedy_polarizations = pickle.load(f)
+
+    with open(os.path.join(run_dir, "params.json"), "r") as f:
+            params = json.load(f)
+
+    params["wandb_init"] = False
+
+    # --- Initialize environment and agent ---
+    env = FJDepolarize(**params)
+    agent = DQN(env = env, **params)
+
+    # --- Load model weights ---
+    q_net_path = os.path.join(run_dir, "q_network_params.pth")
+    target_net_path = os.path.join(run_dir, "target_network_params.pth")
+
+    agent.q_network.load_state_dict(torch.load(q_net_path, map_location=torch.device("cpu")))
+    agent.target_network.load_state_dict(torch.load(target_net_path, map_location=torch.device("cpu")))
+
+    epsilon =  1e-4
+
+    results = {}
+    for (n, k), pols in greedy_polarizations.items():
         env = FJDepolarize(n=n, k=k)
-        polarizations = []
-        for state in states:
-            _, pol = depolarize_greedy(state, env)
-            polarizations.append(pol)
-        results[(n, k)] = polarizations
+        polarization_diff = 0
+        dqn_better = 0
+        greedy_better = 0
+        for i, state in enumerate(test_states[n]):
+            state["edges_left"] = k
+            _, polarization_dqn = depolarize_policy(state, env, agent.policy_greedy)
+            polarization_diff = polarization_diff + polarization_dqn - greedy_polarizations[(n,k)][i]
+            if abs(polarization_dqn - greedy_polarizations[(n,k)][i]) > epsilon:
+                if polarization_dqn < greedy_polarizations[(n,k)][i]:
+                    dqn_better += 1
+                else:
+                    greedy_better += 1
+        results[(n,k)] = {"number_states": len(test_states[n]),
+                            "dqn_better": dqn_better,
+                            "greedy_better": greedy_better,
+                            "difference": polarization_diff}
 
-    with open(os.path.join(save_path, "greedy_polarizations.pkl"), "wb") as f:
+    with open(os.path.join(run_dir, f"greedy_comparison_results.pkl"), "wb") as f:
         pickle.dump(results, f)
+    
 
-    return results
+def visualize_comparison(run_name):
+     
+    run_dir = os.path.join("..", "saved files", "dqn", "saved_runs_dqn", run_name)
 
-def compute_greedy_for_state(state_data):
-    n, k, i, state = state_data
-    env = FJDepolarize(n=n, k=k)
-    _, pol = depolarize_greedy(state, env)
-    return (n, k, i, pol)
+    with open(os.path.join(run_dir, "params.json"), "r") as f:
+            params = json.load(f)
 
-def compute_greedy_polarizations_parallel(state_dict, max_workers=8, save_path="saved files/dqn/greedy_comparison"):
-    tasks = []
+    with open(os.path.join(run_dir, "greedy_comparison_results.pkl"), "rb") as f:
+            results = pickle.load(f)
 
-    # Prepare input tuples (n, k, index, state) for parallel processing
-    for (n, k), states in state_dict.items():
-        for i, state in enumerate(states):
-            tasks.append((n, k, i, state))
 
-    results = {}
+    # Define the ranges
+    n_values = list({n for n, _ in results.keys()})
+    k_values = list({k for _, k in results.keys()})
 
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        future_to_state = {executor.submit(compute_greedy_for_state, t): t for t in tasks}
-        for future in as_completed(future_to_state):
-            n, k, i, pol = future.result()
-            if (n, k) not in results:
-                results[(n, k)] = {}
-            results[(n, k)][i] = pol
+    # Create matrices for annotations and heatmap coloring
+    annot_matrix = []
+    color_matrix = []
 
-    os.makedirs(save_path, exist_ok=True)
-    with open(os.path.join(save_path, "greedy_polarizations_parallel.pkl"), "wb") as f:
-        pickle.dump(results, f)
+    for k in k_values:
+        row_annot = []
+        row_color = []
+        for n in n_values:
+            key = (n, k)
+            if key in results:
+                r = results[key]
+                num = r["number_states"]
+                dqn = r["dqn_better"]
+                greedy = r["greedy_better"]
+                diff = r["difference"]
+                diff_norm = diff / num if num != 0 else 0
 
-    return results
+                # Annotation text
+                annot = f"better: {dqn}\nworse: {greedy}\n equal: {num-dqn-greedy}\n {diff_norm:.4f}"
+
+                row_annot.append(annot)
+                row_color.append(diff_norm)
+            else:
+                row_annot.append("")
+                row_color.append(np.nan)
+        annot_matrix.append(row_annot)
+        color_matrix.append(row_color)
+
+    # Convert to DataFrame for seaborn
+    annot_df = pd.DataFrame(annot_matrix, index=k_values, columns=n_values)
+    color_df = pd.DataFrame(color_matrix, index=k_values, columns=n_values)
+
+    # Plotting
+    plt.figure(figsize=(12, 6))
+    ax = sns.heatmap(color_df, annot=annot_df, fmt='', cmap="RdYlGn_r", cbar_kws={'label': 'Average Difference in Polarization Gain'}, linewidths=0.5, linecolor='gray', vmin=0, vmax=0.035)
+
+    # Add black rectangle around cell for which we trained
+    n_target = params["n"]
+    k_target = params["k"]
+    row_idx = k_values.index(k_target) # Get the row and column indices in the matrix
+    col_idx = n_values.index(n_target)
+    rect = patches.Rectangle((col_idx, row_idx), 1, 1, fill=False, edgecolor='black', linewidth=3) # Rectangle parameters: (x, y) is the bottom left of the cell
+    ax.add_patch(rect)
+
+    plt.xlabel("n")
+    plt.ylabel("k")
+    plt.title(f"Heatmap of DQN-Agent trained on n={n_target} and k={k_target} vs. Greedy")
+    plt.tight_layout()
+
+    # Save the figure to the specified path
+    save_path = os.path.join(run_dir, "heatmap_dqn_vs_greedy.png")
+    plt.savefig(save_path)
+    plt.close()
+
+
+
+# def compute_greedy_for_states(data):
+#     states, n, k = data
+#     env = FJDepolarize(n=n, k=k)
+#     polarizations = []
+#     for state in states:
+#         _, pol = depolarize_greedy(state, env)
+#         polarizations.append(pol)
+#     return n, k, polarizations
+
+# def compute_greedy_polarizations_parallel(ks, state_dict, max_workers=8,filename = "greedy_polarizations", save_path="saved files/dqn/greedy_comparison"):
+#     tasks = []
+
+#     for n, states in state_dict.items():
+#         for k in ks:
+#             tasks.append((states, n, k))
+#     print("start")
+#     results = {}
+
+#     with ProcessPoolExecutor(max_workers=max_workers) as executor:
+#         future_to_state = {executor.submit(compute_greedy_for_states, t): t for t in tasks}
+#         for future in as_completed(future_to_state):
+#             print("hey")
+#             n, k, polarizations = future.result()
+#             results[(n, k)] = polarizations
+    
+#     print("end")
+#     os.makedirs(save_path, exist_ok=True)
+#     with open(os.path.join(save_path, f"{filename}_parallel.pkl"), "wb") as f:
+#         pickle.dump(results, f)
+
+#     return results
 
