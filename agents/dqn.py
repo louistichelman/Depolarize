@@ -49,9 +49,9 @@ class DQN:
 
         if self.wandb_init:
             random_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5)) # to ensure a unique run_name
-            embed_dim = kwargs.get("embed_dim", "_default")
+            embed_dim = model_q.embed_dim
             num_layers = len(model_q.layers)
-            num_heads = kwargs.get("num_heads", "_default")
+            num_heads = model_q.num_heads if model_q.num_heads is not None else 0
             self.run_name = kwargs.get("run_name", f"{model_architecture}-{qnet_approach}-n{env.n}-k{env.k}-hd{embed_dim}-layers{num_layers}-lr{learning_rate}-heads{num_heads}-bs{self.batch_size}-{random_code}")
             wandb.init(
             project="Depolarize",
@@ -141,6 +141,8 @@ class DQN:
                 
             if step % self.target_update_freq == 0:
                 self.target_network.load_state_dict(self.q_network.state_dict())
+        if self.wandb_init:
+            wandb.finish()
             
 class SimpleReplayBuffer:
     def __init__(self, capacity):

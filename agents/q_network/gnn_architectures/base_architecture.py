@@ -6,8 +6,8 @@ class BaseArchitecture(torch.nn.Module, ABC):
     def __init__(self, embed_dim, **kwargs):
         super().__init__()
         self.device = kwargs.get("device", torch.device("cuda" if torch.cuda.is_available() else "cpu"))
-        self.to(self.device)
         self.embed_dim = embed_dim
+        self.num_heads = None
 
     def forward(self, raw_states):
         """

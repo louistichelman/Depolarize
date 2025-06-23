@@ -11,37 +11,35 @@ class Graphormer(BaseArchitecture):
         super().__init__(embed_dim, **kwargs)
         self.input_proj = nn.Linear(in_features=3, out_features=embed_dim)
         self.layers = nn.ModuleList([GraphormerLayer(embed_dim, num_heads) for _ in range(num_layers)])
+        self.num_heads = num_heads
+        self.to(self.device)
 
     def prepare_batch(self, raw_states):
         xs = []
         influences = []
 
         for state in raw_states:
-            G, sigma, tau, l, _ = state
-            n_nodes = G.number_of_nodes()
+            n_nodes = state["graph_data"].num_nodes
 
-            # Node features
-            sigma_tensor = torch.tensor(sigma, dtype=torch.float32)
-            tau_tensor = torch.zeros((n_nodes, 1))
-            if tau is not None:
-                tau_tensor[tau] = 1.0
-            l_tensor = torch.full((n_nodes, 1), fill_value=l, dtype=torch.float32)
-            x = torch.cat([sigma_tensor.view(-1, 1), tau_tensor, l_tensor], dim=1)
+            # --- Build node features ---
+            sigma_tensor = torch.tensor(state["sigma"], dtype=torch.float32, device=self.device).view(-1, 1)
+            tau_tensor = torch.zeros((n_nodes, 1), dtype=torch.float32, device=self.device)
+            if state["tau"] is not None:
+                tau_tensor[state["tau"]] = 1.0
+            l_tensor = torch.full((n_nodes, 1), fill_value=state["edges_left"], dtype=torch.float32, device=self.device)
+            x = torch.cat([sigma_tensor, tau_tensor, l_tensor], dim=1)
             xs.append(x)
 
             # Influence matrix
-            nodelist = sorted(G.nodes())
-            L = torch.tensor(nx.laplacian_matrix(G, nodelist=nodelist).toarray(), dtype=torch.float32)
-            I = torch.eye(n_nodes, dtype=torch.float32)
-            influence_matrix = torch.linalg.inv(I + L)
+            influence_matrix = torch.tensor(state["influence_matrix"], device=self.device, dtype=torch.float32)
             influences.append(influence_matrix)
 
         x_batch = torch.stack(xs)                  # Shape: [B, N, 3]
         influence_batch = torch.stack(influences)  # Shape: [B, N, N]
 
         return {
-            "x": x_batch.to(self.device),
-            "influence_matrix": influence_batch.to(self.device)
+            "x": x_batch,
+            "influence_matrix": influence_batch
         }
 
     def forward_batch(self, batch):
@@ -64,9 +62,9 @@ class GraphormerLayer(nn.Module):
         super().__init__()
         self.attn = GraphormerAttention(embed_dim, num_heads)
         self.ffn = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim * 4),
+            nn.Linear(embed_dim, embed_dim * 3),
             nn.GELU(),
-            nn.Linear(embed_dim * 4, embed_dim),
+            nn.Linear(embed_dim * 3, embed_dim),
         )
         self.norm1 = nn.LayerNorm(embed_dim)
         self.norm2 = nn.LayerNorm(embed_dim)
@@ -90,6 +88,11 @@ class GraphormerAttention(nn.Module):
         self.v_proj = nn.Linear(embed_dim, embed_dim)
         self.out_proj = nn.Linear(embed_dim, embed_dim)
 
+        # scaling of influence matrix
+        self.influence_weight = nn.Parameter(torch.tensor(1.0))
+        self.influence_bias = nn.Parameter(torch.tensor(0.0))
+
+
     def forward(self, x, influence_matrix):
         """
         Args:
@@ -110,8 +113,8 @@ class GraphormerAttention(nn.Module):
         attn_scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.head_dim)  # [B, H, N, N]
 
         # Inject influence matrix (broadcasted over heads)
-        influence_matrix = influence_matrix.unsqueeze(1)  # [B, 1, N, N]
-        attn_scores = attn_scores * (1+influence_matrix)
+        influence_matrix = self.influence_weight * influence_matrix + self.influence_bias
+        attn_scores = attn_scores * influence_matrix.unsqueeze(1) # [B, 1, N, N]
 
         # Softmax normalization
         attn_weights = F.softmax(attn_scores, dim=-1)  # [B, H, N, N]

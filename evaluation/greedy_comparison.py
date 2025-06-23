@@ -108,7 +108,6 @@ def compare_dqn_greedy(run_name, filename_test_states = "test_states_19.06", fil
                             "greedy_better": greedy_better,
                             "difference": polarization_diff}
 
-    print("end of comparison")
     with open(os.path.join(run_dir, f"greedy_comparison_results.pkl"), "wb") as f:
         pickle.dump(results, f)
     
@@ -177,7 +176,6 @@ def visualize_comparison(run_name):
     plt.title(f"Heatmap of DQN-Agent trained on n={n_target} and k={k_target} vs. Greedy")
     plt.tight_layout()
 
-    print("saving pic")
     # Save the figure to the specified path
     save_path = os.path.join(run_dir, "heatmap_dqn_vs_greedy.png")
     plt.savefig(save_path)
