@@ -2,7 +2,7 @@ import os
 import pickle
 from env.fj_depolarize import FJDepolarize
 from env.fj_depolarize_simple import DepolarizeSimple
-from evaluation.depolarizing_functions import depolarize_greedy, depolarize_policy
+from evaluation.depolarizing_functions import depolarize_greedy, depolarize_policy, depolarize_random
 from tqdm import tqdm
 from agents.dqn import DQN
 import json
@@ -13,7 +13,7 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 
-def generate_random_states(n_values, num_states=500, filename = "test_states", save_path="saved files/dqn/greedy_comparison"):
+def generate_random_states(n_values, num_states=150, filename = "test_states", save_path="saved files/dqn/greedy_comparison"):
     os.makedirs(save_path, exist_ok=True)
     all_states = {}
 
@@ -46,7 +46,7 @@ def compute_greedy_polarizations(k_values, test_states, filename = "greedy_polar
     results = {}
 
     for n, states in tqdm(test_states.items()):
-        for k in k_values:
+        for k in tqdm(k_values):
             env = FJDepolarize(n=n, k=k)
             polarizations = []
             for state in states:
@@ -181,37 +181,82 @@ def visualize_comparison(run_name):
     plt.savefig(save_path)
     plt.close()
 
+def visualize_dqn_vs_greedy_single_setting(run_name, n = None, k= None, filename_test_states = "test_states_19.06", filename_greedy_polarizatios = "greedy_polarizations_19.06"):
 
+    run_dir = os.path.join("saved files", "dqn", "saved_runs_dqn", run_name)
+    comparison_dir = os.path.join("saved files", "dqn", "greedy_comparison")
 
-# def compute_greedy_for_states(data):
-#     states, n, k = data
-#     env = FJDepolarize(n=n, k=k)
-#     polarizations = []
-#     for state in states:
-#         _, pol = depolarize_greedy(state, env)
-#         polarizations.append(pol)
-#     return n, k, polarizations
+    with open(os.path.join(comparison_dir, f"{filename_test_states}.pkl"), "rb") as f:
+            test_states = pickle.load(f)
 
-# def compute_greedy_polarizations_parallel(ks, state_dict, max_workers=8,filename = "greedy_polarizations", save_path="saved files/dqn/greedy_comparison"):
-#     tasks = []
+    with open(os.path.join(comparison_dir, f"{filename_greedy_polarizatios}.pkl"), "rb") as f:
+            greedy_polarizations = pickle.load(f)
 
-#     for n, states in state_dict.items():
-#         for k in ks:
-#             tasks.append((states, n, k))
-#     print("start")
-#     results = {}
+    with open(os.path.join(run_dir, "params.json"), "r") as f:
+            params = json.load(f)
 
-#     with ProcessPoolExecutor(max_workers=max_workers) as executor:
-#         future_to_state = {executor.submit(compute_greedy_for_states, t): t for t in tasks}
-#         for future in as_completed(future_to_state):
-#             print("hey")
-#             n, k, polarizations = future.result()
-#             results[(n, k)] = polarizations
-    
-#     print("end")
-#     os.makedirs(save_path, exist_ok=True)
-#     with open(os.path.join(save_path, f"{filename}_parallel.pkl"), "wb") as f:
-#         pickle.dump(results, f)
+    params["wandb_init"] = False
 
-#     return results
+    # --- Initialize environment and agent ---
+    env = FJDepolarize(**params)
+    agent = DQN(env = env, **params)
+
+    # --- Load model weights ---
+    q_net_path = os.path.join(run_dir, "q_network_params.pth")
+    target_net_path = os.path.join(run_dir, "target_network_params.pth")
+
+    agent.q_network.load_state_dict(torch.load(q_net_path, map_location=torch.device("cpu")))
+    agent.target_network.load_state_dict(torch.load(target_net_path, map_location=torch.device("cpu")))
+
+    if n is None:
+        n = params["n"]
+    if k is None:
+        k = params["k"] 
+
+    test_states_n = test_states[n]
+    greedy_polarizations_nk = greedy_polarizations[(n, k)]
+
+    polarization_gains = []
+    for i, state in tqdm(enumerate(test_states_n)):
+        state["edges_left"] = k
+        G, sigma = state["graph"], state["sigma"]
+        polarization_start = env.polarization(G, sigma)
+        _, polarization_dqn = depolarize_policy(state, env, agent.policy_greedy)
+        _, polarization_random = depolarize_random(state, env)
+        polarization_gains.append(( polarization_start - polarization_dqn ,
+                                    polarization_start - greedy_polarizations_nk[i],
+                                    polarization_start - polarization_random))
+
+    # Step 1: Sort by max(triple)
+    polarization_gains_sorted = sorted(polarization_gains, key=lambda t: max(t))
+
+    # Step 2: Prepare data for plotting
+    data = {
+        'Index': [],
+        'Gain': [],
+        'Method': []
+    }
+
+    for i, (x, y, z) in enumerate(polarization_gains_sorted, start=1):
+        data['Index'] += [i, i, i]
+        data['Gain'] += [x, y, z]
+        data['Method'] += ['DQN', 'Greedy', 'Random']
+
+    df = pd.DataFrame(data)
+
+    # Step 3: Plot with Seaborn
+    sns.set_theme(style="whitegrid")
+    plt.figure(figsize=(10, 6))
+    sns.scatterplot(data=df, x='Index', y='Gain', hue='Method', style='Method', s=30)
+
+    plt.title('Polarization Gains ordered by Maximum Gain')
+    plt.xlabel('Sorted Index')
+    plt.ylabel('Polarization Gain')
+    plt.tight_layout()
+
+    # Save the figure to the specified path
+    save_path = os.path.join(run_dir, "evaluation_single_setting.png")
+    plt.savefig(save_path)
+    plt.close()
+
 

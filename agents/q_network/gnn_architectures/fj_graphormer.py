@@ -114,7 +114,7 @@ class GraphormerAttention(nn.Module):
 
         # Inject influence matrix (broadcasted over heads)
         influence_matrix = self.influence_weight * influence_matrix + self.influence_bias
-        attn_scores = attn_scores * influence_matrix.unsqueeze(1) # [B, 1, N, N]
+        attn_scores = attn_scores + influence_matrix.unsqueeze(1) # [B, 1, N, N]
 
         # Softmax normalization
         attn_weights = F.softmax(attn_scores, dim=-1)  # [B, H, N, N]
