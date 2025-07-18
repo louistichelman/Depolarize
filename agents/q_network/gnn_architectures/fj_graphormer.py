@@ -26,7 +26,7 @@ class Graphormer(BaseArchitecture):
             tau_tensor = torch.zeros((n_nodes, 1), dtype=torch.float32, device=self.device)
             if state["tau"] is not None:
                 tau_tensor[state["tau"]] = 1.0
-            l_tensor = torch.full((n_nodes, 1), fill_value=state["edges_left"], dtype=torch.float32, device=self.device)
+            l_tensor = torch.full((n_nodes, 1), fill_value=state.get("edges_left", 0), dtype=torch.float32, device=self.device)
             x = torch.cat([sigma_tensor, tau_tensor, l_tensor], dim=1)
             xs.append(x)
 

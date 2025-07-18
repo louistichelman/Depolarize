@@ -33,8 +33,8 @@ class GlobalGNN(BaseArchitecture):
             sigma_tensor = torch.tensor(state["sigma"], dtype=torch.float32, device=self.device).view(-1, 1)
             tau_tensor = torch.zeros((n_nodes, 1), dtype=torch.float32, device=self.device)
             if state["tau"] is not None:
-                tau_tensor[state["tau"]] = 1.0
-            l_tensor = torch.full((n_nodes, 1), fill_value=state["edges_left"], dtype=torch.float32, device=self.device)
+                tau_tensor[state["tau"]] = 1
+            l_tensor = torch.full((n_nodes, 1), fill_value=state.get("edges_left", 0), dtype=torch.float32, device=self.device)
             
             # --- Concatenate node features ---
             data.x = torch.cat([sigma_tensor, tau_tensor, l_tensor], dim=1)

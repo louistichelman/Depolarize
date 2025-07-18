@@ -5,8 +5,10 @@ from collections import deque
 import random
 import wandb
 import string
+from visualization import visualize_graph, visualize_opinions
 from .q_network.gnn_architectures import ARCHITECTURE_REGISTRY
 from .q_network.qnet_approaches import QNET_REGISTRY
+import os
 
         
 class DQN:
@@ -27,15 +29,18 @@ class DQN:
         self.wandb_init = kwargs.get("wandb_init", True)
         self.start_e = kwargs.get("start_e", 1.0)
         self.end_e = kwargs.get("end_e", 1.0)
-        self.exploration_fraction = kwargs.get("exploration_fraction", 0.1)
+        self.reset_probability = kwargs.get("reset_probability", None)
+        self.parallel_envs = kwargs.get("parallel_envs", 1)  # Number of parallel environments, default is 1
+        self.log_step = kwargs.get("log_step", 10000)
 
-        self.env = env
+        self.envs = [env.clone() for _ in range(self.parallel_envs)]  # Create multiple instances of the environment
+        self.n = env.n
 
         model_class = ARCHITECTURE_REGISTRY[model_architecture]
         qnet_class = QNET_REGISTRY[qnet_approach]
 
-        model_q = model_class(graph_size_training = env.n, **kwargs) # Create two identical models for q and target networks
-        model_target = model_class(graph_size_training = env.n, **kwargs)
+        model_q = model_class(graph_size_training = self.n, **kwargs) # Create two identical models for q and target networks
+        model_target = model_class(graph_size_training = self.n, **kwargs)
 
         self.q_network = qnet_class(model_q)
         self.target_network = qnet_class(model_target)
@@ -43,7 +48,7 @@ class DQN:
         self.target_network.load_state_dict(self.q_network.state_dict())
 
         self.optimizer = optim.Adam(self.q_network.parameters(), lr=learning_rate)
-        self.replay_buffer = SimpleReplayBuffer(10000)
+        self.replay_buffer = SimpleReplayBuffer(80000)
 
         self.global_step = 0
 
@@ -52,7 +57,10 @@ class DQN:
             embed_dim = model_q.embed_dim
             num_layers = len(model_q.layers)
             num_heads = model_q.num_heads if model_q.num_heads is not None else 0
-            self.run_name = kwargs.get("run_name", f"{model_architecture}-{qnet_approach}-n{env.n}-k{env.k}-hd{embed_dim}-layers{num_layers}-lr{learning_rate}-heads{num_heads}-bs{self.batch_size}-{random_code}")
+            if kwargs.get("environment") == "friedkin_johnson":
+                self.run_name = kwargs.get("run_name", f"{model_architecture}-{qnet_approach}-n{self.n}-k{env.k}-hd{embed_dim}-layers{num_layers}-lr{learning_rate}-heads{num_heads}-bs{self.batch_size}-{random_code}")
+            else:
+                self.run_name = kwargs.get("run_name", f"{model_architecture}-{qnet_approach}-n{self.n}-hd{embed_dim}-layers{num_layers}-lr{learning_rate}-heads{num_heads}-bs{self.batch_size}-g{self.gamma}-par{self.parallel_envs}-e{self.end_e}-tuf{self.target_update_freq}-{random_code}")
             wandb.init(
             project="Depolarize",
             name=self.run_name,
@@ -66,7 +74,6 @@ class DQN:
                 "gamma": self.gamma,
                 "train_freq": self.train_freq,
                 "target_update_freq": self.target_update_freq,
-                "exploration_fraction": self.exploration_fraction,
                 "start_e": self.start_e,
                 "end_e": self.end_e,
             })
@@ -91,9 +98,8 @@ class DQN:
         q_values_all = self.q_network(states).squeeze()            # shape: [B * n]
         next_q_values_all = self.target_network(next_states).squeeze()  # shape: [B * n]
 
-        n = self.env.n 
-        q_values = q_values_all.view(len(batch), n)
-        next_q_values = next_q_values_all.view(len(batch), n)
+        q_values = q_values_all.view(len(batch), self.n)
+        next_q_values = next_q_values_all.view(len(batch), self.n)
 
         # Select Q-values for the actions taken (shape: [B])
         q_selected = q_values.gather(1, actions.view(-1, 1)).squeeze()
@@ -111,21 +117,46 @@ class DQN:
         return max(slope * t + start_e, end_e)
     
     def train(self, profiler = None):
-        state = self.env.reset()
+        states = [self.envs[i].reset() for i in range(self.parallel_envs)]
         loss_window = deque(maxlen=100)
+        opinions = [states[0]["sigma"].copy()]
         for step in range(1, self.timesteps_train + 1):
             self.global_step += 1
-            epsilon = self.linear_schedule(self.start_e, self.end_e, self.exploration_fraction * self.timesteps_train, step)
+            epsilon = self.linear_schedule(self.start_e, self.end_e, self.timesteps_train, step)
             if random.random() < epsilon:
-                action = random.randint(0, self.env.n - 1)
+                actions = [random.randint(0, self.n - 1) for _ in range(self.parallel_envs)]
             else:
-                q_values = self.q_network([state]).squeeze()
-                action = q_values.argmax().item()
+                q_values = self.q_network(states).squeeze()  # Shape: [B*n]
+                q_values = q_values.view(len(states), self.n)
+                actions = q_values.argmax(dim=1).tolist()
 
-            next_state, reward, done = self.env.step(action)
-            self.replay_buffer.add(state, action, reward, next_state, done)
+            next_states = []
+            for i in range(self.parallel_envs):
+                next_state, reward, done = self.envs[i].step(actions[i])
+                # tau = states[i]["tau"]
+                # if tau is not None:
+                    # print(f"tau: {tau}, opinion: {states[i]['sigma'][tau]}")
+                    # print(f"action: {actions[i]}, opinion: {states[i]['sigma'][actions[i]]}")
+                    # print("connected") if states[i]["graph"].has_edge(tau, actions[i]) else print("not connected")
+                    # print(reward)
+                self.replay_buffer.add(states[i], actions[i], reward, next_state, done)
+                next_state = next_state if not done else self.envs[i].reset()
+                if self.reset_probability is not None and random.random() < self.reset_probability:
+                    next_state = self.envs[i].reset()
+                next_states.append(next_state)
 
-            state = next_state if not done else self.env.reset()
+            states = next_states
+            opinions.append(states[0]["sigma"].copy())
+
+            if step % self.log_step == 0:
+                run_dir = os.path.join("saved files", "dqn", "nonlinear", "saved_runs", self.run_name, "logging")
+                os.makedirs(run_dir, exist_ok=True)
+                visualize_graph(states[0]["graph"], states[0]["sigma"], title=f"Step {step}", file_path=os.path.join(run_dir, f"step_{step}_graph.png"))
+                visualize_opinions(self.envs[0], opinions, title=f"Step {step}", file_path=os.path.join(run_dir, f"step_{step}_opinions.png"))
+            
+            # if self.reset_env_after_n_steps is not None and step % self.reset_env_after_n_steps == 0:
+            #     states = [self.envs[i].reset() for i in range(self.parallel_envs)]
+            #     opinions = [states[0]["sigma"].copy()]
 
             if len(self.replay_buffer) >= self.batch_size and step % self.train_freq == 0:
                 batch = self.replay_buffer.sample(self.batch_size)
