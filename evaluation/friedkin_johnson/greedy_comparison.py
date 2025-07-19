@@ -1,7 +1,7 @@
 import os
 import pickle
 from env import FJDepolarize, DepolarizeSimple
-from .depolarizing_functions import depolarize_greedy, depolarize_policy, depolarize_random
+from .depolarizing_functions import depolarize_policy, depolarize_random, depolarize_greedy_fj
 from tqdm import tqdm
 from agents.dqn import DQN
 import json
@@ -49,7 +49,7 @@ def compute_greedy_polarizations(k_values, test_states, filename = "greedy_polar
             env = FJDepolarize(n=n, k=k)
             polarizations = []
             for state in states:
-                _, pol = depolarize_greedy(state, env)
+                _, pol = depolarize_greedy_fj(state, env)
                 polarizations.append(pol)
             results[(n, k)] = polarizations
 
