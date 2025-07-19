@@ -70,7 +70,8 @@ class FJDepolarize:
         L = nx.laplacian_matrix(G).toarray()
         I = np.eye(L.shape[0])
         influence_matrix = np.linalg.inv(I + L)
-        polarization = np.linalg.norm(influence_matrix.dot(np.array(sigma)))
+        expressed_sigma = influence_matrix @ sigma
+        polarization = expressed_sigma @ expressed_sigma
         if return_influence_matrix:
             return polarization, influence_matrix
         return polarization
