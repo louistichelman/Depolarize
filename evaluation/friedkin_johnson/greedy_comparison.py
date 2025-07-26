@@ -1,7 +1,7 @@
 import os
 import pickle
 from env import FJDepolarize, DepolarizeSimple
-from .depolarizing_functions import depolarize_policy, depolarize_random, depolarize_greedy_fj
+from .depolarizing_functions import depolarize_using_policy, depolarize_random_strategy, depolarize_greedy_fj
 from tqdm import tqdm
 from agents.dqn import DQN
 import json
@@ -95,7 +95,7 @@ def compare_dqn_greedy(run_name, filename_test_states = "test_states_19.06", fil
         greedy_better = 0
         for i, state in enumerate(test_states[n]):
             state["edges_left"] = k
-            _, polarization_dqn = depolarize_policy(state, env, agent.policy_greedy)
+            _, polarization_dqn = depolarize_using_policy(state, env, agent.policy_greedy)
             polarization_diff = polarization_diff + polarization_dqn - greedy_polarizations[(n,k)][i]
             if abs(polarization_dqn - greedy_polarizations[(n,k)][i]) > epsilon:
                 if polarization_dqn < greedy_polarizations[(n,k)][i]:
@@ -219,8 +219,8 @@ def visualize_dqn_vs_greedy_single_setting(run_name, n = None, k= None, filename
         state["edges_left"] = k
         G, sigma = state["graph"], state["sigma"]
         polarization_start = env.polarization(G, sigma)
-        _, polarization_dqn = depolarize_policy(state, env, agent.policy_greedy)
-        _, polarization_random = depolarize_random(state, env)
+        _, polarization_dqn = depolarize_using_policy(state, env, agent.policy_greedy)
+        _, polarization_random = depolarize_random_strategy(state, env)
         polarization_gains.append(( polarization_start - polarization_dqn ,
                                     polarization_start - greedy_polarizations_nk[i],
                                     polarization_start - polarization_random))
