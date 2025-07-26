@@ -10,11 +10,12 @@ class NLOpinionDynamics:
         self.n = n
         self.average_degree = kwargs.get("average_degree", 6)
         self.n_edge_updates_per_step = kwargs.get("n_edge_updates_per_step", 5)
-        self.g = kwargs.get("g", 0.999)
-        self.K = kwargs.get("K", 0.01)
+        self.lam = kwargs.get("lam", 0.999)
+        self.kappa = kwargs.get("kappa", 0.01)
         self.alpha = kwargs.get("alpha", 0.2)
-        self.beta = kwargs.get("beta", 0.6)
-        self.epsilon = kwargs.get("epsilon", 0.1)
+        self.beta = kwargs.get("beta", 0.5)
+        self.gamma = kwargs.get("gamma", 0.5)
+        self.epsilon = kwargs.get("epsilon", 0.0)
         self.current_state = None
     
     def reset(self):
@@ -79,14 +80,11 @@ class NLOpinionDynamics:
                                            self.influence_on_each_other(sigma[node], opinion, opinion_range)
                                              * opinion) for opinion in neighbor_opinions]
             if neighbor_opinions:
-                new_sigma[node] = self.g*sigma[node]+ self.K * sum(smoothed_opinions) / len(neighbor_opinions)
+                new_sigma[node] = self.lam * sigma[node] + self.kappa * sum(smoothed_opinions) / len(neighbor_opinions)
         return new_sigma
 
-    @staticmethod
-    def influence_on_each_other(opinion, opinion_neighbor, opinion_range):
-        # opposite_sign_ratio = sum(np.sign(opinion1) != np.sign(opinion_other) for opinion_other in opinions) / len(opinions)
-        # print(1 - abs(opinion1 - opinion2) / (opinion_range))
-        return 1 - abs(opinion - opinion_neighbor) / opinion_range
+    def influence_on_each_other(self, opinion, opinion_neighbor, opinion_range):
+        return 1 - abs(opinion - opinion_neighbor) / (self.beta * opinion_range)
     
     def social_rewiring(self, G, sigma, node):  
         neighbors = set(G.neighbors(node))
@@ -109,10 +107,10 @@ class NLOpinionDynamics:
         
 
     def removal_probability(self, opinion, opinion_neighbor):
-            return (abs(opinion - opinion_neighbor)*(1 - 2 * self.epsilon) + self.epsilon) ** self.beta
+            return abs(opinion - opinion_neighbor) ** self.gamma
     
     def addition_probability(self, opinion, opinion_candidate):
-            return (abs(opinion - opinion_candidate)*(1 - 2 * self.epsilon) + self.epsilon) ** (-self.beta)
+            return abs(opinion - opinion_candidate) ** (-self.gamma)
     
     @staticmethod
     def polarization(sigma):
