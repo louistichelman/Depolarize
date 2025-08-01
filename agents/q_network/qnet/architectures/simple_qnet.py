@@ -1,6 +1,7 @@
-from .base_qnet import BaseQNetwork
+from ..base_qnet import BaseQNetwork
 import torch
 import torch.nn.functional as F
+
 
 class SimpleQNetwork(BaseQNetwork):
     def __init__(self, model):
