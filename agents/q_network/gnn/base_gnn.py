@@ -42,6 +42,6 @@ class BaseGNN(torch.nn.Module, ABC):
     def forward_batch(self, batch):
         """
         The actual forward pass given a preprocessed batch.
-        Returns: node embeddings.
+        Returns: node embeddings and a batch vector indicating the graph each node belongs to.
         """
         raise NotImplementedError("Must be implemented by subclass.")

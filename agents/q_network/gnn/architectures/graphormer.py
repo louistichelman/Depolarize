@@ -87,28 +87,18 @@ class GraphormerLayer(nn.Module):
             nn.Linear(embed_dim, embed_dim),
         )
 
-        self.dropout1 = nn.Dropout(0.1)
-        self.dropout2 = nn.Dropout(0.1)
+        # self.dropout1 = nn.Dropout(0.1)
+        # self.dropout2 = nn.Dropout(0.1)
 
         self.norm1 = nn.LayerNorm(embed_dim)
         self.norm2 = nn.LayerNorm(embed_dim)
 
     def forward(self, x, influence_matrix):
-        # compute attention
-        _x = x
-        x = self.attn(x, influence_matrix)
+        # compute attention (with LN before attention)
+        x = self.attn(self.norm1(x), influence_matrix) + x
 
-        # add and norm
-        x = self.dropout1(x)
-        x = self.norm1(_x + x)
-
-        # feed-forward network
-        _x = x
-        x = self.ffn(x)
-
-        # add and norm
-        x = self.dropout2(x)
-        x = self.norm2(_x + x)
+        # compute feed-forward network (with LN before FFN)
+        x = self.ffn(self.norm2(x)) + x
         return x
 
 
@@ -126,9 +116,13 @@ class GraphormerAttention(nn.Module):
         self.v_proj = nn.Linear(embed_dim, embed_dim, bias=False)
         self.out_proj = nn.Linear(embed_dim, embed_dim)
 
-        # scaling of influence matrix
-        self.influence_weight = nn.Parameter(torch.tensor(1.0))
-        self.influence_bias = nn.Parameter(torch.tensor(0.0))
+        # scaling of influence matrix before softmax
+        self.influence_weight_1 = nn.Parameter(torch.tensor(1.0))
+        self.influence_bias_1 = nn.Parameter(torch.tensor(0.0))
+
+        # scaling of influence matrix after softmax
+        self.influence_weight_2 = nn.Parameter(torch.tensor(1.0))
+        self.influence_bias_2 = nn.Parameter(torch.tensor(0.0))
 
     def forward(self, x, influence_matrix):
 
@@ -143,16 +137,19 @@ class GraphormerAttention(nn.Module):
         attn_scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.head_dim)
 
         # Inject influence matrix (broadcasted over heads)
-        influence_matrix = (
-            self.influence_weight * influence_matrix + self.influence_bias
+        influence_matrix_before_softmax = (
+            self.influence_weight_1 * influence_matrix + self.influence_bias_1
         )
-        attn_scores = attn_scores + influence_matrix.unsqueeze(1)
+        attn_scores = attn_scores + influence_matrix_before_softmax.unsqueeze(1)
 
         # Softmax normalization
         attn_weights = F.softmax(attn_scores, dim=-1)  # [B, H, N, N]
 
-        # Optional: mask or rescale with influence again after softmax
-        # attn_weights = attn_weights * influence_matrix
+        # Apply influence matrix after softmax
+        influence_matrix_after_softmax = (
+            self.influence_weight_2 * influence_matrix + self.influence_bias_2
+        )
+        attn_weights = attn_weights * influence_matrix_after_softmax.unsqueeze(1)
 
         # Weighted sum of values
         out = torch.matmul(attn_weights, v)  # [B, H, N, D]
