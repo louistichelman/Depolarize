@@ -102,13 +102,15 @@ def evaluate_dqn_policy_vs_greedy_various_n(
             results_rerun = compare_dqn_vs_greedy_various_n(
                 rerun_path, n_values, k_values
             )
-            results["dqn_better"] += results_rerun["dqn_better"]
-            results["greedy_better"] += results_rerun["greedy_better"]
-            results["difference"] += results_rerun["difference"]
+            for key in results_rerun:
+                results[key]["dqn_better"] += results_rerun[key]["dqn_better"]
+                results[key]["greedy_better"] += results_rerun[key]["greedy_better"]
+                results[key]["difference"] += results_rerun[key]["difference"]
         number_of_reruns = len(os.listdir(os.path.join(run_dir, "reruns")))
-        results["dqn_better"] /= number_of_reruns
-        results["greedy_better"] /= number_of_reruns
-        results["difference"] /= number_of_reruns
+        for key in results:
+            results[key]["dqn_better"] /= number_of_reruns + 1
+            results[key]["greedy_better"] /= number_of_reruns + 1
+            results[key]["difference"] /= number_of_reruns + 1
 
     with open(os.path.join(run_dir, f"evaluation_comparison_to_greedy.pkl"), "wb") as f:
         pickle.dump(results, f)
@@ -151,7 +153,7 @@ def compare_dqn_vs_greedy_various_n(run_dir, n_values, k_values):
     epsilon = 1e-4
 
     results = {}
-    for n in n_values:
+    for n in tqdm(n_values, desc="Evaluating DQN vs Greedy for various n"):
         for k in k_values:
             with open(
                 os.path.join(evaluation_dir, f"greedy_solutions_n{n}_k{k}.pkl"), "rb"

@@ -1,6 +1,8 @@
 import numpy as np
 import networkx as nx
 from torch_geometric.utils import from_networkx
+from scipy.sparse.csgraph import shortest_path
+
 
 from ..base_env import BaseEnv
 
@@ -26,8 +28,10 @@ class FJOpinionDynamics(BaseEnv):
         super().__init__()
 
         self.n = n
-        self.average_degree = kwargs.get("average_degree", 3 + n // 50)
+        self.average_degree = kwargs.get("average_degree", 5)
         self.k = kwargs.get("k", n // 10)
+
+        self.keep_spd_matrix = kwargs.get("keep_spd_matrix", False)
 
         self.current_state = None
 
@@ -111,8 +115,7 @@ class FJOpinionDynamics(BaseEnv):
                 terminal,
             )
 
-    @staticmethod
-    def polarization(G, sigma, return_influence_matrix=False):
+    def polarization(self, G, sigma, return_influence_matrix=False):
         """
         Returns the polarization of a network.
         """
@@ -121,6 +124,19 @@ class FJOpinionDynamics(BaseEnv):
         influence_matrix = np.linalg.inv(I + L)
         expressed_sigma = influence_matrix @ sigma
         polarization = expressed_sigma @ expressed_sigma
+
         if return_influence_matrix:
+            if self.keep_spd_matrix:
+                spd = shortest_path(
+                    nx.to_numpy_array(G), directed=False, unweighted=True
+                )
+
+                # Replace inf with the maximum finite distance
+                max_dist = np.nanmax(spd[spd != np.inf])
+                spd[spd == np.inf] = max_dist + 10
+
+                spd = -spd + (np.max(spd))
+
+                return polarization, spd
             return polarization, influence_matrix
         return polarization

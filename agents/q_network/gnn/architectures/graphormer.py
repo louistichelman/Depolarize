@@ -128,7 +128,7 @@ class GraphormerAttention(nn.Module):
 
         B, N, _ = x.size()
 
-        # Project input to queries, keys, and values and reshape to [B, H, N, D]
+        # Project input to queries, keys, and values and reshape to [B, H, N, D/H]
         q = self.q_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
         k = self.k_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
         v = self.v_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
@@ -152,10 +152,10 @@ class GraphormerAttention(nn.Module):
         attn_weights = attn_weights * influence_matrix_after_softmax.unsqueeze(1)
 
         # Weighted sum of values
-        out = torch.matmul(attn_weights, v)  # [B, H, N, D]
+        out = torch.matmul(attn_weights, v)  # [B, H, N, D/H]
 
         # Concatenate heads
-        out = out.transpose(1, 2).contiguous().view(B, N, self.embed_dim)  # [B, N, E]
+        out = out.transpose(1, 2).contiguous().view(B, N, self.embed_dim)  # [B, N, D]
 
         # Final linear projection
         return self.out_proj(out)
