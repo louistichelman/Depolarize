@@ -177,9 +177,9 @@ def generate_test_states_and_greedy_solutions_fj(n_values, k_values):
     )
 
 
-def evaluate_run_fj(run_name, n_values, k_values, single_setting=False):
+def evaluate_run_fj(run_name, n_values, k_values, single_setting=False, n=None, k=None):
     if single_setting:
-        compare_dqn_policy_to_greedy_single_setting(run_name)
+        compare_dqn_policy_to_greedy_single_setting(run_name, n=n, k=k)
         visualize_comparison_dqn_vs_greedy_single_setting(run_name)
     else:
         evaluate_dqn_policy_vs_greedy_various_n(
@@ -188,6 +188,7 @@ def evaluate_run_fj(run_name, n_values, k_values, single_setting=False):
             k_values=k_values,
         )
         visualize_comparison_dqn_vs_greedy(run_name)
+        performance_overview_run(run_name)
 
 
 # ------ Evaluation NL-DepolarizeOnline ------
@@ -209,11 +210,12 @@ if __name__ == "__main__":
         "n": 100,
         "average_degree": 5,  # 6 for 200, 4 for 50, 4 for 25
         "n_edge_updates_per_step": 5,  # 5 for 200, 2 for 50, 1 for 25
+        "keep_spd_matrix": True,  # Keep shortest path distance matrix
         "k": 10,
     }
     params_agent = {
-        "gnn": "GraphSage",
-        "qnet": "complex",
+        "gnn": "Graphormer",  # "Global", "GraphSage", "Graphormer"
+        "qnet": "complex",  # "simple", "complex"
         "learning_rate": 0.0004,
         "embed_dim": 128,
         "num_layers": 4,
@@ -224,58 +226,51 @@ if __name__ == "__main__":
         "reset_probability": None,  # 0.0001
         "parallel_envs": 1,
         "end_e": 1,  # End epsilon for exploration
-        "target_update_freq": 20000,  # Frequency of target network updates
-        "timesteps_train": 200000,  # Number of timesteps to train
+        "target_update_freq": 100000,  # Frequency of target network updates
+        "timesteps_train": 300000,  # Number of timesteps to train
     }
 
     # generate_test_states_and_greedy_solutions_fj(
-    #     n_values=[75, 100, 125, 150], k_values=[5, 10, 15, 20]
+    #     n_values=[150], k_values=[5, 10, 15, 20]
     # )
-    run_name = run_training(params_env, params_agent)
-    # # continue_training(run_name=run_name, timesteps_train=100000)
+
+    # visualize_comparison_dqn_vs_greedy_simple(
+    #     "GraphSage-complex-n100-k10-hd128-layers4-lr0.0004-heads0-bs64-tuf100000-YGFP9"
+    # )
+    run_name = (
+        "GraphSage-complex-n175-k15-hd128-layers5-lr0.0004-heads0-bs64-tuf100000-3VDDT"
+    )
+    # visualize_comparison_dqn_vs_greedy_simple(run_name)
+    compare_dqn_policy_to_greedy_single_setting(run_name, n=200, k=20)
+    visualize_comparison_dqn_vs_greedy_single_setting(run_name)
+
+    # run_name = run_training(params_env, params_agent)
+    # run_name = (
+    #     "Graphormer-complex-n100-k10-hd128-layers2-lr0.0004-heads4-bs64-tuf100000-XDURS"
+    # )
+    # rerun_training(run_name=run_name, number_of_reruns=2)
+
     # evaluate_run_fj(
     #     run_name=run_name,
-    #     n_values=[75, 100, 125, 150],
+    #     n_values=[75, 100, 125, 150, 175, 200],
     #     k_values=[5, 10, 15, 20],
     #     single_setting=False,
     # )
 
-    # continue_training(run_name=run_name, timesteps_train=100000)
-
-    # run_name = "GraphSage-complex-n100-hd128-layers4-lr0.0004-heads0-bs64-g1-par1-e1-tuf20000-KVNUK"
-    # rerun_training(run_name=run_name, number_of_reruns=1)
-    # # continue_training(run_name=run_name, timesteps_train=100000)
+    # run_name = run_training(params_env, params_agent)
 
     # evaluate_run_fj(
     #     run_name=run_name,
-    #     n_values=[75, 100, 125, 150],
+    #     n_values=[75, 100, 125, 150, 175, 200],
     #     k_values=[5, 10, 15, 20],
     #     single_setting=False,
     # )
 
-    # evaluate_baseline_strategies(params_env)
+    # run_name = run_training(params_env, params_agent)
 
-    # Generating test states and greedy polarizations for fj evaluation
-    # n_values = [100]
-    # k_values = [10, 15, 20]
-    # filename_test_states = "test_states_n100_k_10-15-20_27-06"
-    # filename_greedy_polarization = "greedy_polarizations_n100_k_10-15-20_27-06"
-    # generate_test_states_and_greedy_polarizations(n_values, k_values, filename_test_states, filename_greedy_polarization)
-
-    # Run and evaluate fj
-    # run_name = run_training(params, timesteps_train= 100000)
-    # evaluate_run(run_name, filename_test_states=filename_test_states, filename_greedy_polarization=filename_greedy_polarization)
-    # run_name = continue_training(timesteps_train = 100000, run_name = "GraphSage-complex-n100-k15-hd128-layers4-lr0.0004-heads0-bs64-G30BI_+")
-    # evaluate_run(run_name, filename_test_states=filename_test_states, filename_greedy_polarization=filename_greedy_polarization)
-    # run_name = continue_training(timesteps_train = 100000, run_name=run_name)
-    # evaluate_run(run_name, filename_test_states=filename_test_states, filename_greedy_polarization=filename_greedy_polarization)
-
-    # evaluate_single_setting_fj("global-simple-n100-k10-hd128-layers4-lr0.0001-heads0-bs64-IKUIM", n=100, k=10, filename_test_states=filename_test_states, filename_greedy_polarization=filename_greedy_polarization)
-
-    # Run and evaluate nonlinear
-    # run_name = run_training(params, timesteps_train= 150000)
-    # run_name = continue_training(run_name="GraphSage-complex-n200-hd63-layers4-lr0.0008-heads0-bs64-G48MQ_+", timesteps_train=100000)
-    # evaluate_run_nonlinear(run_name)
-    # evaluate_baseline_strategies(params)
-    # evaluate_run_nonlinear("GraphSage-complex-n50-hd64-layers4-lr0.0001-heads0-bs64-g0.8-par4-e0.6-tuf6000-54N38")
-    # evaluate_run_nonlinear("GraphSage-complex-n200-hd128-layers6-lr0.0001-heads0-bs64-g0.5-par4-e0.6-tuf4000-MF1WR")
+    # evaluate_run_fj(
+    #     run_name=run_name,
+    #     n_values=[75, 100, 125, 150, 175, 200],
+    #     k_values=[5, 10, 15, 20],
+    #     single_setting=False,
+    # )
