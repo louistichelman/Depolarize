@@ -2,6 +2,8 @@ import numpy as np
 import networkx as nx
 from torch_geometric.utils import from_networkx
 import math
+import torch
+import random
 
 from ..base_env import BaseEnv
 
@@ -21,13 +23,22 @@ class NLOpinionDynamics(BaseEnv):
     The actions are node indices.
     """
 
-    def __init__(self, n, **kwargs):
+    def __init__(self, n=None, start_states=None, **kwargs):
         super().__init__()
 
+        self.keep_influence_matrix = kwargs.get("keep_influence_matrix", False)
+
         # graph parameters
-        self.n = n
-        self.average_degree = kwargs.get("average_degree", 3 + n // 50)
-        self.n_edge_updates_per_step = kwargs.get("n_edge_updates_per_step", n // 40)
+        if start_states is not None:
+            self.n = self._load_start_states(start_states)
+        elif n is not None:
+            self.n = n
+        else:
+            raise ValueError("Either 'n' or 'start_states' must be provided.")
+        self.average_degree = kwargs.get("average_degree", 6)
+        self.n_edge_updates_per_step = kwargs.get(
+            "n_edge_updates_per_step", self.n // 40
+        )
 
         # social influence parameters
         self.lam = kwargs.get("lam", 0.999)
@@ -40,22 +51,46 @@ class NLOpinionDynamics(BaseEnv):
 
         self.current_state = None
 
+    def _load_start_states(self, file_path):
+        """
+        Load start states from a file.
+        """
+        self.start_states = torch.load(file_path, weights_only=False)
+        random_state_to_get_n = self.reset()
+        return len(random_state_to_get_n["sigma"])
+
     def reset(self):
         """
         Resets the environment to a random state. We use a Watts-Strogatz graph
         and initial opinions are chosen uniformly from [-5, 5].
         Returns: current_state
         """
-        G = nx.watts_strogatz_graph(self.n, k=self.average_degree, p=0.2)
+        if hasattr(self, "start_states"):
+            # If start states are loaded, randomly select one
+            self.current_state = random.choice(self.start_states)
+            if (
+                self.keep_influence_matrix  # and self.current_state["influence_matrix"] is None
+            ):
+                _, self.current_state["influence_matrix"] = self.polarization(
+                    self.current_state["graph"],
+                    self.current_state["sigma"],
+                    keep_influence_matrix=True,
+                )
+            return self.current_state.copy()
+
+        G = nx.watts_strogatz_graph(self.n, k=self.average_degree, p=0.1)
         sigma = [np.random.uniform(-5, 5) for _ in range(self.n)]
 
-        polarization = self.polarization(sigma)
+        polarization, influence_matrix = self.polarization(
+            G, sigma, keep_influence_matrix=True
+        )
 
         self.current_state = {
             "graph": G,
             "sigma": sigma,
             "tau": None,
             "polarization": polarization,
+            "influence_matrix": influence_matrix,
             "graph_data": from_networkx(G),
         }
 
@@ -93,15 +128,24 @@ class NLOpinionDynamics(BaseEnv):
             self.current_state["graph"], self.current_state["sigma"] = (
                 self.opinion_dynamics(G_new, self.current_state["sigma"])
             )
-            self.current_state["polarization"] = self.polarization(
-                self.current_state["sigma"]
+            polarization_new = self.polarization(
+                self.current_state["graph"],
+                self.current_state["sigma"],
+                keep_influence_matrix=self.keep_influence_matrix,
             )
+            if self.keep_influence_matrix:
+                (
+                    self.current_state["polarization"],
+                    self.current_state["influence_matrix"],
+                ) = polarization_new
+            else:
+                self.current_state["polarization"] = polarization_new
             self.current_state["graph_data"] = from_networkx(
                 self.current_state["graph"]
             )
             return (
                 self.current_state,
-                polarization_old - self.current_state["polarization"],
+                50 * (polarization_old - self.current_state["polarization"]),
                 False,  # no states are terminal in this environment
             )
 
@@ -131,9 +175,7 @@ class NLOpinionDynamics(BaseEnv):
             return 1 - abs(opinion - opinion_neighbor) / (self.beta * opinion_range)
 
         for node in G.nodes():
-            neighbor_opinions = [sigma[j] for j in G.neighbors(node)] + [
-                self.beliefs[node]
-            ]
+            neighbor_opinions = [sigma[j] for j in G.neighbors(node)]
             activations = [
                 math.tanh(
                     self.alpha * influence_on_each_other(sigma[node], opinion) * opinion
@@ -198,8 +240,34 @@ class NLOpinionDynamics(BaseEnv):
             G.add_edge(node, new_neighbor)
 
     @staticmethod
-    def polarization(sigma):
+    def polarization(G, sigma, keep_influence_matrix=False):
         """
         Returns the polarization of the network (only depends on sigma).
         """
+        if keep_influence_matrix:
+            # L = nx.laplacian_matrix(G).toarray()
+            # I = np.eye(L.shape[0])
+            # influence_matrix = np.linalg.inv(I + L)
+            # return np.linalg.norm(sigma), influence_matrix
+            # if not nx.is_connected(G):
+            #     raise ValueError("Graph G must be connected.")
+
+            L = nx.laplacian_matrix(G).toarray() + 1e-5 * np.eye(len(G))
+            n = len(sigma)
+            J = np.ones((n, n)) / n
+
+            M = np.linalg.inv(L + J)
+
+            diag = np.diag(M)
+            R = diag[:, None] + diag[None, :] - 2 * M
+            R = np.clip(R, 0, 3)
+
+            if random.random() < 0.001:
+                # check that R is a valid distance matrix
+                print(np.max(R))
+            if not nx.is_connected(G):
+                print("Warning: Graph G is not connected, max R: ", np.max(R))
+
+            return np.linalg.norm(sigma), R
+
         return np.linalg.norm(sigma)

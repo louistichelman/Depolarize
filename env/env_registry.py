@@ -5,6 +5,6 @@ from .base_env import BaseEnv
 
 ENVIRONMENT_REGISTRY = {
     "nonlinear": NLOpinionDynamics,
-    "friedkin_johnson": FJOpinionDynamics,
-    "friedkin_johnson_simple": FJOpinionDynamicsFinite,
+    "friedkin-johnson": FJOpinionDynamics,
+    "friedkin-johnson-simple": FJOpinionDynamicsFinite,
 }

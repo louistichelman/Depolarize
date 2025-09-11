@@ -1,5 +1,7 @@
 import numpy as np
 import networkx as nx
+import torch
+import random
 from torch_geometric.utils import from_networkx
 from scipy.sparse.csgraph import shortest_path
 
@@ -24,16 +26,30 @@ class FJOpinionDynamics(BaseEnv):
     The actions are node indices.
     """
 
-    def __init__(self, n, **kwargs):
+    def __init__(self, n=None, start_states=None, **kwargs):
         super().__init__()
 
-        self.n = n
-        self.average_degree = kwargs.get("average_degree", 5)
-        self.k = kwargs.get("k", n // 10)
+        if start_states is not None:
+            self.n = self._load_start_states(start_states)
+        elif n is not None:
+            self.n = n
+        else:
+            raise ValueError("Either 'n' or 'start_states' must be provided.")
 
-        self.keep_spd_matrix = kwargs.get("keep_spd_matrix", False)
+        self.average_degree = kwargs.get("average_degree", 6)
+        self.k = kwargs.get("k", self.n // 10)
+
+        self.keep_resistance_matrix = kwargs.get("keep_resistance_matrix", False)
 
         self.current_state = None
+
+    def _load_start_states(self, file_path):
+        """
+        Load start states from a file.
+        """
+        self.start_states = torch.load(file_path, weights_only=False)
+        n = len(self.start_states[0]["sigma"])
+        return n
 
     def reset(self):
         """
@@ -41,11 +57,20 @@ class FJOpinionDynamics(BaseEnv):
         and initial opinions are chosen uniformly from [-1, 1].
         Returns: current_state
         """
-        G = nx.watts_strogatz_graph(self.n, k=self.average_degree, p=0.2)
+        if hasattr(self, "start_states"):
+            # If start states are loaded, randomly select one
+            self.current_state = random.choice(self.start_states)
+            self.current_state["edges_left"] = self.k
+            return self.current_state.copy()
+
+        G = nx.watts_strogatz_graph(self.n, k=self.average_degree, p=0.1)
         sigma = np.random.uniform(-1, 1, size=self.n)
 
         polarization, influence_matrix = self.polarization(
-            G, sigma, return_influence_matrix=True
+            G,
+            sigma,
+            return_influence_matrix=True,
+            keep_resistance_matrix=self.keep_resistance_matrix,
         )
 
         self.current_state = {
@@ -103,7 +128,10 @@ class FJOpinionDynamics(BaseEnv):
                 self.current_state["polarization"],
                 self.current_state["influence_matrix"],
             ) = self.polarization(
-                G_new, self.current_state["sigma"], return_influence_matrix=True
+                G_new,
+                self.current_state["sigma"],
+                return_influence_matrix=True,
+                keep_resistance_matrix=self.keep_resistance_matrix,
             )
             self.current_state["graph"], self.current_state["graph_data"] = (
                 G_new,
@@ -115,7 +143,10 @@ class FJOpinionDynamics(BaseEnv):
                 terminal,
             )
 
-    def polarization(self, G, sigma, return_influence_matrix=False):
+    @staticmethod
+    def polarization(
+        G, sigma, return_influence_matrix=False, keep_resistance_matrix=False
+    ):
         """
         Returns the polarization of a network.
         """
@@ -126,17 +157,15 @@ class FJOpinionDynamics(BaseEnv):
         polarization = expressed_sigma @ expressed_sigma
 
         if return_influence_matrix:
-            if self.keep_spd_matrix:
-                spd = shortest_path(
-                    nx.to_numpy_array(G), directed=False, unweighted=True
-                )
+            if keep_resistance_matrix:
+                n = len(sigma)
+                J = np.ones((n, n)) / n
 
-                # Replace inf with the maximum finite distance
-                max_dist = np.nanmax(spd[spd != np.inf])
-                spd[spd == np.inf] = max_dist + 10
+                M = np.linalg.inv(L + J)
 
-                spd = -spd + (np.max(spd))
+                diag = np.diag(M)
+                R = diag[:, None] + diag[None, :] - 2 * M
 
-                return polarization, spd
+                return polarization, R
             return polarization, influence_matrix
         return polarization

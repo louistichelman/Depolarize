@@ -19,9 +19,9 @@ class DQN:
 
     def __init__(
         self,
-        env: BaseEnv,
-        gnn: str,  # has to be in GNN_REGISTRY
-        qnet: str,  # has to be in QNET_REGISTRY
+        env: BaseEnv = None,  # None, if agent only used for evaluation
+        gnn: str = "GraphSage",  # has to be in GNN_REGISTRY
+        qnet: str = "simple",  # has to be in QNET_REGISTRY
         **kwargs,
     ):
 
@@ -42,18 +42,20 @@ class DQN:
             "reset_probability", None
         )  # relevant for non-episodic environments
         self.parallel_envs = kwargs.get("parallel_envs", 1)
+        self.td_loss_one_edge = kwargs.get("td_loss_one_edge", False)
 
         # Create multiple instances of the environment
-        self.envs = [env.clone() for _ in range(self.parallel_envs)]
-        self.n = env.n
+        if env is not None:
+            self.envs = [env.clone() for _ in range(self.parallel_envs)]
+            self.n = env.n
 
         # define architecture
         gnn_architecture = GNN_REGISTRY[gnn]
         qnet_class = QNET_REGISTRY[qnet]
 
         # Create two identical models for q and target networks
-        gnn_q = gnn_architecture(graph_size_training=self.n, **kwargs)
-        gnn_target = gnn_architecture(graph_size_training=self.n, **kwargs)
+        gnn_q = gnn_architecture(**kwargs)
+        gnn_target = gnn_architecture(**kwargs)
         self.q_network = qnet_class(gnn_q)
         self.target_network = qnet_class(gnn_target)
 
@@ -62,12 +64,12 @@ class DQN:
 
         # define optimizer and replay buffer
         self.optimizer = optim.Adam(self.q_network.parameters(), lr=learning_rate)
-        self.replay_buffer = SimpleReplayBuffer(80000)
+        self.replay_buffer = SimpleReplayBuffer(20000)
 
         # keep track of step even if we train several times
         self.global_step = 0
 
-        if self.wandb_init:
+        if self.wandb_init and env is not None:
             # to ensure a unique run_name we generate a random code
             random_code = "".join(
                 random.choices(string.ascii_uppercase + string.digits, k=5)
@@ -77,7 +79,7 @@ class DQN:
 
             self.run_name = kwargs.get(
                 "run_name",
-                f"{gnn}-{qnet}-n{self.n}-k{k}-hd{gnn_q.embed_dim}-layers{len(gnn_q.layers)}-lr{learning_rate}-heads{num_heads}-bs{self.batch_size}-tuf{self.target_update_freq}-{random_code}",
+                f"{gnn}-{qnet}-n{self.n}-k{k}-hd{gnn_q.embed_dim}-layers{len(gnn_q.layers)}-lr{learning_rate}-heads{num_heads}-bs{self.batch_size}-p{self.parallel_envs}-g{self.gamma}-tuf{self.target_update_freq}-{random_code}",
             )
             wandb.init(
                 project="Depolarize",
@@ -97,12 +99,14 @@ class DQN:
                 },
             )
 
-    def policy_greedy(self, state):
+    def policy_greedy(self, state, give_q_valaues=False, **kwargs):
         """
         Returns the action with the highest Q-value for the given state.
         """
         with torch.no_grad():
             q_values = self.q_network([state]).squeeze()
+        if give_q_valaues:
+            return q_values.argmax().item(), q_values
         return q_values.argmax().item()
 
     def compute_td_loss(self, batch):
@@ -112,6 +116,12 @@ class DQN:
         """
         states, actions, rewards, next_states, dones = zip(*batch)
 
+        if self.td_loss_one_edge:
+            taus = torch.tensor(
+                [state["tau"] is None for state in states],
+                dtype=torch.float32,
+                device=self.device,
+            )
         actions = torch.tensor(actions, dtype=torch.long, device=self.device)
         rewards = torch.tensor(rewards, dtype=torch.float32, device=self.device)
         dones = torch.tensor(dones, dtype=torch.float32, device=self.device)
@@ -129,8 +139,12 @@ class DQN:
         # Get the maximum Q-value for the next states
         max_next_q = next_q_values.max(dim=1).values
 
-        # Compute target: reward + gamma * max_a' Q(s', a') * (1 - done)
-        td_target = rewards + (1 - dones) * self.gamma * max_next_q
+        if self.td_loss_one_edge:
+            # Compute target: reward for adding one edge
+            td_target = rewards + taus * max_next_q
+        else:
+            # Compute target: reward + gamma * max_a' Q(s', a') * (1 - done)
+            td_target = rewards + (1 - dones) * self.gamma * max_next_q
 
         loss = F.mse_loss(q_selected, td_target)
         return loss

@@ -1,13 +1,14 @@
 import numpy as np
 import networkx as nx
 
+
 def greedy_fj_depolarize(G, sigma, k):
     """
     Input:
     G: networkx.Graph (unweighted, undirected)
     sigma: np.array of internal opinions (shape n,)
     k: number of steps
-    
+
     Output:
     best_edges: list of chosen edges [(i,j), ...]
     G_final: networkx.Graph after modifications
@@ -23,12 +24,11 @@ def greedy_fj_depolarize(G, sigma, k):
     A = nx.to_numpy_array(G, nodelist=nodes)
     L = np.diag(A.sum(axis=1)) - A
 
-
     for _ in range(k):
         LD_inv = np.linalg.inv(L + D)
         z = LD_inv @ sigma
 
-        max_delta_pol= -np.inf
+        max_delta_pol = -np.inf
         best_edge = None
 
         for i in range(n):
@@ -40,9 +40,11 @@ def greedy_fj_depolarize(G, sigma, k):
                 z_diff = z[i] - z[j]
                 denom = 1 + delta * viTx
 
-                delta_pol = (z_diff * (2 * delta * z @ x) / denom -
-                          (z_diff ** 2) * (delta ** 2 * x @ x) / denom ** 2)
-                
+                delta_pol = (
+                    z_diff * (2 * delta * z @ x) / denom
+                    - (z_diff**2) * (delta**2 * x @ x) / denom**2
+                )
+
                 # print("Checking edge ({}, {}): delta_pol = {}".format(nodes[i], nodes[j], delta_pol))
 
                 if delta_pol > max_delta_pol:
@@ -57,7 +59,6 @@ def greedy_fj_depolarize(G, sigma, k):
 
         # update Laplacian
         L = np.diag(A.sum(axis=1)) - A
-
 
     # Rebuild final graph
     G_final = nx.from_numpy_array(A)

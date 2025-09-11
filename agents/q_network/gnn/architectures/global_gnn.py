@@ -16,7 +16,7 @@ class GlobalGNN(BaseGNN):
     Number of parameters: 3 * num_layers * embed_dim^2 + (4+num_layers) * embed_dim
     """
 
-    def __init__(self, graph_size_training, embed_dim=64, num_layers=4, **kwargs):
+    def __init__(self, embed_dim=64, num_layers=4, **kwargs):
         super().__init__(embed_dim, **kwargs)
         self.input_layer = GlobalConv(in_channels=3, hidden_channels=embed_dim)
         self.layers = nn.ModuleList(
