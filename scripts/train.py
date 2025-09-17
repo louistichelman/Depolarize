@@ -19,7 +19,7 @@ from evaluation import (
 from visualization import (
     visualize_dqn_vs_greedy_ood_n,
     visualize_dqn_vs_greedy_ood_n_simple,
-    visualize_variance_ood_n_simple,
+    visualize_variance_ood_n,
     visualize_dqn_vs_greedy,
     performance_overview,
     visualize_polarization_development_multiple_policies,
@@ -188,7 +188,7 @@ def evaluate_run_fj_depolarize(run_name, n_values, k_values, n, k, folder="val")
     visualize_dqn_vs_greedy_ood_n(run_name, folder=folder)
     visualize_dqn_vs_greedy_ood_n_simple(run_name, folder=folder)
     performance_overview(run_name, folder=folder)
-    visualize_variance_ood_n_simple(run_name, folder=folder)
+    visualize_variance_ood_n(run_name, folder=folder)
 
 
 def evaluate_run_nonlinear(run_name, n_values, n_steps=20000, folder="val"):
@@ -427,7 +427,8 @@ def main():
     # run_name = "GraphSage-complex-n150-k15-hd128-layers4-lr0.0004-heads0-bs64-p1-g1.0-tuf100000-HKNWX"
     # visualize_variance_ood_n_simple(run_name, folder=args.folder)
     # continue_training(run_name=run_name, timesteps_train=args.timesteps_train)
-    # rerun_training(run_name=run_name, number_of_reruns=3)
+    if args.number_of_reruns is not None:
+        rerun_training(run_name=run_name, number_of_reruns=args.number_of_reruns)
     if args.environment == "friedkin-johnson":
         # Evaluate and visualize results
         evaluate_run_fj_depolarize(

@@ -189,7 +189,7 @@ def visualize_dqn_vs_greedy_ood_n_simple(run_name, folder="val"):
     plt.close()
 
 
-def visualize_variance_ood_n_simple(run_name, folder="val"):
+def visualize_variance_ood_n(run_name, folder="val"):
     """
     Visualizes results of method compare_dqn_policy_to_greedy_various_n in evalutation/friedkin_johnson/evaluation,
         i.e., visualizes performance differences between dqn solution and greedy solutions for various n and ks.
@@ -203,7 +203,7 @@ def visualize_variance_ood_n_simple(run_name, folder="val"):
         params_env = json.load(f)
 
     with open(
-        os.path.join(run_dir, folder, f"evaluation_comparison_to_greedy_variance.pkl"),
+        os.path.join(run_dir, f"evaluation_comparison_to_greedy_variance_{folder}.pkl"),
         "rb",
     ) as f:
         variances = pickle.load(f)
@@ -218,17 +218,18 @@ def visualize_variance_ood_n_simple(run_name, folder="val"):
     annot_matrix = []
     color_matrix = []
 
-    diffs = []
+    variances_list = []
     for k in k_values:
         row_annot = []
         row_color = []
         for n in n_values:
             key = (n, k)
             if key in variances:
-                variance = variances[key]
+                variance = np.sqrt(variances[key] / 10000)
 
                 row_annot.append(f"{variance:.4f}")
                 row_color.append(variance)
+                variances_list.append(variance)
             else:
                 row_annot.append("")
                 row_color.append(np.nan)
@@ -238,6 +239,9 @@ def visualize_variance_ood_n_simple(run_name, folder="val"):
     # Convert to DataFrame for seaborn
     annot_df = pd.DataFrame(annot_matrix, index=k_values, columns=n_values)
     color_df = pd.DataFrame(color_matrix, index=k_values, columns=n_values)
+
+    # overall average variance
+    overall_avg_variance = np.nanmean(variances_list)
 
     # Plotting
     plt.figure(figsize=(8, 4))
@@ -253,18 +257,9 @@ def visualize_variance_ood_n_simple(run_name, folder="val"):
         vmax=0.5,
     )
 
-    # # Add black rectangle around cell for which we trained
-    # n_target = params_env["n"]
-    # k_target = params_env["k"]
-    # row_idx = k_values.index(k_target)  # Get the row and column indices in the matrix
-    # col_idx = n_values.index(n_target)
-    # rect = patches.Rectangle(
-    #     (col_idx, row_idx), 1, 1, fill=False, edgecolor="black", linewidth=3
-    # )  # Rectangle parameters: (x, y) is the bottom left of the cell
-    # ax.add_patch(rect)
-
     plt.xlabel("n")
     plt.ylabel("k")
+    plt.title(f"Overall Average: {overall_avg_variance:.4f}")
     plt.tight_layout()
 
     # Save the figure to the specified path
@@ -353,22 +348,32 @@ def visualize_dqn_vs_greedy(run_name, folder="val"):
         polarization_gains = pickle.load(f)
 
     # Sort the polarization gains by greedy gain
-    polarization_gains.sort(key=lambda x: x[1])
+    polarization_gains.sort(key=lambda x: x[0])
 
     # Prepare data for plotting
-    data = {"Index": [], "Gain": [], "Method": []}
+    data = {"Index": [], "Polarization": [], "Method": []}
 
-    for i, (x, y, z) in enumerate(polarization_gains, start=1):
-        data["Index"] += [i, i, i]
-        data["Gain"] += [x, y, z]
-        data["Method"] += ["DQN", "Greedy", "Random"]
+    for i, (
+        no_change,
+        polarization_dqn,
+        polarization_greedy,
+        polarization_random,
+    ) in enumerate(polarization_gains, start=1):
+        data["Index"] += [i, i, i, i]
+        data["Polarization"] += [
+            no_change,
+            polarization_dqn,
+            polarization_greedy,
+            polarization_random,
+        ]
+        data["Method"] += ["Without Modification", "DQN", "Greedy", "Random"]
 
     df = pd.DataFrame(data)
 
     # Plot with Seaborn
     sns.set_theme(style="whitegrid")
     plt.figure(figsize=(5, 3))
-    sns.scatterplot(data=df, y="Index", x="Gain", hue="Method", s=10)
+    sns.scatterplot(data=df, y="Index", x="Polarization", hue="Method", s=10)
 
     # # Add horizontal lines for the average gain of each method
     # for method, color in zip(["DQN", "Greedy", "Random"], ["C0", "C1", "C2"]):

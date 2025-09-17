@@ -177,9 +177,10 @@ def evaluate_dqn_policy_vs_greedy(run_name, n, k, folder="val"):
         polarization_random = env.polarization(G=G_random, sigma=sigma)
         polarization_gains.append(
             (
-                polarization_start - polarization_dqn,
-                polarization_start - greedy_solution,
-                polarization_start - polarization_random,
+                polarization_start,
+                polarization_dqn,
+                greedy_solution,
+                polarization_random,
             )
         )
 
