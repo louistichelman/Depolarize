@@ -1,0 +1,10 @@
+{
+    "environment": "friedkin-johnson",
+    "start_states": "data/friedkin-johnson/train/start_states_train_n300_d6.pt",
+    "n": 300,
+    "average_degree": 6,
+    "n_edge_updates_per_step": 5,
+    "keep_resistance_matrix": false,
+    "keep_influence_matrix": false,
+    "k": 15
+}
