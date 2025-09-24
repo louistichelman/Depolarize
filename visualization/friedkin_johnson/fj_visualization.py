@@ -348,7 +348,7 @@ def visualize_dqn_vs_greedy(run_name, folder="val"):
         polarization_gains = pickle.load(f)
 
     # Sort the polarization gains by greedy gain
-    polarization_gains.sort(key=lambda x: x[0])
+    polarization_gains.sort(key=lambda x: x[2])
 
     # Prepare data for plotting
     data = {"Index": [], "Polarization": [], "Method": []}
@@ -362,17 +362,18 @@ def visualize_dqn_vs_greedy(run_name, folder="val"):
         data["Index"] += [i, i, i, i]
         data["Polarization"] += [
             no_change,
-            polarization_dqn,
-            polarization_greedy,
             polarization_random,
+            polarization_greedy,
+            polarization_dqn,
         ]
-        data["Method"] += ["Without Modification", "DQN", "Greedy", "Random"]
+        data["Method"] += ["No Intervention", "Random", "Greedy", "DQN"]
 
     df = pd.DataFrame(data)
 
     # Plot with Seaborn
     sns.set_theme(style="whitegrid")
     plt.figure(figsize=(5, 3))
+    plt.xlim(0, 4)
     sns.scatterplot(data=df, y="Index", x="Polarization", hue="Method", s=10)
 
     # # Add horizontal lines for the average gain of each method
