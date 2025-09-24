@@ -114,61 +114,61 @@ def main():
     print(f"✅ Saved {len(start_states_train)} start states to {save_path}")
 
 
-#     start_states_val, seen = generate_random_states(
-#         env, num_states=args.n_val, seen=seen
-#     )
+    start_states_val, seen = generate_random_states(
+        env, num_states=args.n_val, seen=seen
+    )
 
-#     save_path = os.path.join(env_dir, "val")
-#     os.makedirs(save_path, exist_ok=True)
-#     torch.save(
-#         start_states_val,
-#         os.path.join(
-#             save_path, f"start_states_val_n{args.n}_d{args.average_degree}.pt"
-#         ),
-#     )
+    save_path = os.path.join(env_dir, "val")
+    os.makedirs(save_path, exist_ok=True)
+    torch.save(
+        start_states_val,
+        os.path.join(
+            save_path, f"start_states_val_n{args.n}_d{args.average_degree}.pt"
+        ),
+    )
 
-#     print(f"✅ Saved {len(start_states_val)} start states to {save_path}")
+    print(f"✅ Saved {len(start_states_val)} start states to {save_path}")
 
-#     start_states_test, _ = generate_random_states(
-#         env, num_states=args.n_test, seen=seen
-#     )
+    start_states_test, _ = generate_random_states(
+        env, num_states=args.n_test, seen=seen
+    )
 
-#     save_path = os.path.join(env_dir, "test")
-#     os.makedirs(save_path, exist_ok=True)
-#     torch.save(
-#         start_states_test,
-#         os.path.join(
-#             save_path, f"start_states_test_n{args.n}_d{args.average_degree}.pt"
-#         ),
-#     )
+    save_path = os.path.join(env_dir, "test")
+    os.makedirs(save_path, exist_ok=True)
+    torch.save(
+        start_states_test,
+        os.path.join(
+            save_path, f"start_states_test_n{args.n}_d{args.average_degree}.pt"
+        ),
+    )
 
-#     print(f"✅ Saved {len(start_states_test)} start states to {save_path}")
+    print(f"✅ Saved {len(start_states_test)} start states to {save_path}")
 
-#     if args.out_of_distribution_n is not None:
-#         print(f"Generating OOD test states ...")
-#         for n in args.out_of_distribution_n:
-#             env.n = n
-#             ood_states_val, seen = generate_random_states(env, num_states=args.n_val)
+    if args.out_of_distribution_n is not None:
+        print(f"Generating OOD test states ...")
+        for n in args.out_of_distribution_n:
+            env.n = n
+            ood_states_val, seen = generate_random_states(env, num_states=args.n_val)
 
-#             torch.save(
-#                 ood_states_val,
-#                 os.path.join(
-#                     env_dir, "val", f"start_states_val_n{n}_d{args.average_degree}.pt"
-#                 ),
-#             )
+            torch.save(
+                ood_states_val,
+                os.path.join(
+                    env_dir, "val", f"start_states_val_n{n}_d{args.average_degree}.pt"
+                ),
+            )
 
-#             ood_states_test, _ = generate_random_states(
-#                 env, num_states=args.n_test, seen=seen
-#             )
+            ood_states_test, _ = generate_random_states(
+                env, num_states=args.n_test, seen=seen
+            )
 
-#             torch.save(
-#                 ood_states_test,
-#                 os.path.join(
-#                     env_dir, "test", f"start_states_test_n{n}_d{args.average_degree}.pt"
-#                 ),
-#             )
+            torch.save(
+                ood_states_test,
+                os.path.join(
+                    env_dir, "test", f"start_states_test_n{n}_d{args.average_degree}.pt"
+                ),
+            )
 
-#         print(f"✅ Saved OOD val and test states to {env_dir}")
+        print(f"✅ Saved OOD val and test states to {env_dir}")
 
 
 if __name__ == "__main__":

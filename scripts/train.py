@@ -13,7 +13,6 @@ from env import ENVIRONMENT_REGISTRY
 from agents.dqn import DQN
 from evaluation import (
     evaluate_dqn_policy_vs_greedy_ood_n,
-    evaluate_dqn_policy_vs_greedy,
     test_and_save_policy_dqn,
 )
 from visualization import (
@@ -177,14 +176,13 @@ def rerun_training(run_name, number_of_reruns=1):
 
 
 def evaluate_run_fj_depolarize(run_name, n_values, k_values, n, k, folder="val"):
-    evaluate_dqn_policy_vs_greedy(run_name, n=n, k=k, folder=folder)
     evaluate_dqn_policy_vs_greedy_ood_n(
         run_name=run_name,
         n_values=n_values,
         k_values=k_values,
         folder=folder,
     )
-    visualize_dqn_vs_greedy(run_name, folder=folder)
+    visualize_dqn_vs_greedy(run_name, n=n, k=k, folder=folder)
     visualize_dqn_vs_greedy_ood_n(run_name, folder=folder)
     visualize_dqn_vs_greedy_ood_n_simple(run_name, folder=folder)
     performance_overview(run_name, folder=folder)
@@ -195,7 +193,7 @@ def evaluate_run_nonlinear(run_name, n_values, n_steps=20000, folder="val"):
     test_and_save_policy_dqn(run_name, n_values, n_steps=n_steps, folder=folder)
     visualize_polarization_development_multiple_policies(
         run_name=run_name, folder=folder
-    )
+    )    
 
 
 def main():
@@ -335,6 +333,12 @@ def main():
         help="Whether to compute the TD loss based on the reward for adding one edge (instead of the full action).",
     )
 
+    parser.add_argument(
+        "--record_opinions_while_training",
+        action="store_true",
+        help="Whether to record opinions while training.",
+    )
+
     # parameters for evaluation
     parser.add_argument(
         "--n_values",
@@ -420,11 +424,12 @@ def main():
         "train_freq": args.train_freq,
         "target_update_freq": args.target_update_freq,
         "timesteps_train": args.timesteps_train,
+        "record_opinions_while_training": args.record_opinions_while_training,
     }
 
     # Run training
     run_name = run_training(params_env=params_env, params_agent=params_agent)
-    # run_name = "GraphSage-complex-n150-k15-hd128-layers4-lr0.0004-heads0-bs64-p1-g1.0-tuf100000-HKNWX"
+    # run_name = "Graphormer-complex-n10-k3-hd128-layers4-lr0.0004-heads4-bs64-p1-g1.0-tuf100000-EQBEB"
     # visualize_variance_ood_n_simple(run_name, folder=args.folder)
     # continue_training(run_name=run_name, timesteps_train=args.timesteps_train)
     if args.number_of_reruns is not None:
@@ -442,11 +447,12 @@ def main():
 
     elif args.environment == "nonlinear":
         # Evaluate and visualize results
-        evaluate_run_nonlinear(
-            run_name=run_name,
-            n_values=args.n_values,
-            folder=args.folder,
-        )
+        if not args.record_opinions_while_training: # if we recorded opinions while training, no are not interested in evaluation on other graphs
+            evaluate_run_nonlinear(
+                run_name=run_name,
+                n_values=args.n_values,
+                folder=args.folder,
+            )
 
 
 if __name__ == "__main__":

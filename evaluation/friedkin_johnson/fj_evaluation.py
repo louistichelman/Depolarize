@@ -7,6 +7,7 @@ from tqdm import tqdm
 from agents.dqn import DQN
 import json
 import torch
+import numpy as np
 
 
 def evaluate_dqn_policy_vs_greedy_ood_n(
@@ -23,28 +24,38 @@ def evaluate_dqn_policy_vs_greedy_ood_n(
 
     run_dir = os.path.join("results", "dqn", "friedkin-johnson", "runs", run_name)
 
+    
     results = evaluate_dqn_policy_vs_greedy_ood_n_single_run(
         run_dir, n_values, k_values, folder=folder
     )
 
+    variances = {}
+    for key in results:
+        variances[key] = [np.mean(results[key]["dqn"])]
+
     if os.path.exists(os.path.join(run_dir, "reruns")):
-        variances = {}
         for run_folder in os.listdir(os.path.join(run_dir, "reruns")):
             rerun_path = os.path.join(run_dir, "reruns", run_folder)
             results_rerun = evaluate_dqn_policy_vs_greedy_ood_n_single_run(
                 rerun_path, n_values, k_values, folder=folder
             )
             for key in results_rerun:
-                variances.setdefault(key, []).append(results_rerun[key]["difference"])
+                variances[key].append(np.mean(results_rerun[key]["dqn"]))
                 results[key]["dqn_better"] += results_rerun[key]["dqn_better"]
                 results[key]["greedy_better"] += results_rerun[key]["greedy_better"]
-                results[key]["difference"] += results_rerun[key]["difference"]
+                results[key]["dqn"] += results_rerun[key]["dqn"]
+                results[key]["greedy"] += results_rerun[key]["greedy"]
+                results[key]["random"] += results_rerun[key]["random"]
+                results[key]["before"] += results_rerun[key]["before"]
         number_of_reruns = len(os.listdir(os.path.join(run_dir, "reruns")))
         for key in results:
             variances[key] = torch.var(torch.tensor(variances[key])).item()
             results[key]["dqn_better"] /= number_of_reruns + 1
             results[key]["greedy_better"] /= number_of_reruns + 1
-            results[key]["difference"] /= number_of_reruns + 1
+            results[key]["dqn"] /= number_of_reruns + 1
+            results[key]["greedy"] /= number_of_reruns + 1
+            results[key]["random"] /= number_of_reruns + 1
+            results[key]["before"] /= number_of_reruns + 1
         with open(
             os.path.join(
                 run_dir, f"evaluation_comparison_to_greedy_variance_{folder}.pkl"
@@ -104,27 +115,42 @@ def evaluate_dqn_policy_vs_greedy_ood_n_single_run(
                 greedy_solutions = torch.load(f, weights_only=False)
             env.n = n
             env.k = k
-            polarization_diff = 0
+            polarizations_dqn = []
+            polarizations_greedy = []
+            polarizations_random = []
+            polarizations_before = []
             dqn_better = 0
             greedy_better = 0
             for state, greedy_solution in greedy_solutions:
                 state["edges_left"] = k
+                polarization_before = env.polarization(
+                    G=state["graph"], sigma=state["sigma"]
+                )
                 _, polarization_dqn = depolarize_using_policy(
                     state, env, agent.policy_greedy
                 )
-                polarization_diff = (
-                    polarization_diff + polarization_dqn - greedy_solution
-                )
+                G_random = depolarize_random_strategy(state["graph"], k)
+                polarization_random = env.polarization(G=G_random, sigma=state["sigma"])
+
+                polarizations_before.append(polarization_before)
+                polarizations_dqn.append(polarization_dqn)
+                polarizations_greedy.append(greedy_solution)
+                polarizations_random.append(polarization_random)
+
                 if abs(polarization_dqn - greedy_solution) > epsilon:
                     if polarization_dqn < greedy_solution:
                         dqn_better += 1
                     else:
                         greedy_better += 1
+
             results[(n, k)] = {
                 "number_states": len(greedy_solutions),
                 "dqn_better": dqn_better,
                 "greedy_better": greedy_better,
-                "difference": polarization_diff,
+                "dqn": np.array(polarizations_dqn),
+                "greedy": np.array(polarizations_greedy),
+                "random": np.array(polarizations_random),
+                "before": np.array(polarizations_before),
             }
     return results
 

@@ -2,7 +2,7 @@ wandb
 **/__pycache__/
 *.pyc
 experiments_dp.ipynb
-# experiments_dqn.ipynb
+experiments_dqn.ipynb
 old
 old_stuff
 .DS_Store

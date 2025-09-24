@@ -27,6 +27,7 @@ class NLOpinionDynamics(BaseEnv):
         super().__init__()
 
         self.keep_influence_matrix = kwargs.get("keep_influence_matrix", False)
+        self.keep_resistance_matrix = kwargs.get("keep_resistance_matrix", False)
 
         # graph parameters
         if start_states is not None:
@@ -75,6 +76,7 @@ class NLOpinionDynamics(BaseEnv):
                     self.current_state["graph"],
                     self.current_state["sigma"],
                     keep_influence_matrix=True,
+                    keep_resistance_matrix=self.keep_resistance_matrix,
                 )
             return self.current_state.copy()
 
@@ -82,7 +84,10 @@ class NLOpinionDynamics(BaseEnv):
         sigma = [np.random.uniform(-5, 5) for _ in range(self.n)]
 
         polarization, influence_matrix = self.polarization(
-            G, sigma, keep_influence_matrix=True
+            G,
+            sigma,
+            keep_influence_matrix=True,
+            keep_resistance_matrix=self.keep_resistance_matrix,
         )
 
         self.current_state = {
@@ -132,6 +137,7 @@ class NLOpinionDynamics(BaseEnv):
                 self.current_state["graph"],
                 self.current_state["sigma"],
                 keep_influence_matrix=self.keep_influence_matrix,
+                keep_resistance_matrix=self.keep_resistance_matrix,
             )
             if self.keep_influence_matrix:
                 (
@@ -240,34 +246,33 @@ class NLOpinionDynamics(BaseEnv):
             G.add_edge(node, new_neighbor)
 
     @staticmethod
-    def polarization(G, sigma, keep_influence_matrix=False):
+    def polarization(
+        G, sigma, keep_influence_matrix=False, keep_resistance_matrix=False
+    ):
         """
         Returns the polarization of the network (only depends on sigma).
         """
         if keep_influence_matrix:
-            # L = nx.laplacian_matrix(G).toarray()
-            # I = np.eye(L.shape[0])
-            # influence_matrix = np.linalg.inv(I + L)
-            # return np.linalg.norm(sigma), influence_matrix
-            # if not nx.is_connected(G):
-            #     raise ValueError("Graph G must be connected.")
 
-            L = nx.laplacian_matrix(G).toarray() + 1e-5 * np.eye(len(G))
-            n = len(sigma)
-            J = np.ones((n, n)) / n
+            if keep_resistance_matrix:
+                L = nx.laplacian_matrix(G).toarray() + 1e-5 * np.eye(len(G))
+                n = len(sigma)
+                J = np.ones((n, n)) / n
 
-            M = np.linalg.inv(L + J)
+                M = np.linalg.inv(L + J)
 
-            diag = np.diag(M)
-            R = diag[:, None] + diag[None, :] - 2 * M
-            R = np.clip(R, 0, 3)
+                diag = np.diag(M)
+                R = diag[:, None] + diag[None, :] - 2 * M
+                R = np.clip(R, 0, 3)
 
-            if random.random() < 0.001:
-                # check that R is a valid distance matrix
-                print(np.max(R))
-            if not nx.is_connected(G):
-                print("Warning: Graph G is not connected, max R: ", np.max(R))
+                if not nx.is_connected(G):
+                    print("Warning: Graph G is not connected, max R: ", np.max(R))
 
-            return np.linalg.norm(sigma), R
+                return np.linalg.norm(sigma), R
+
+            L = nx.laplacian_matrix(G).toarray()
+            I = np.eye(L.shape[0])
+            influence_matrix = np.linalg.inv(I + L)
+            return np.linalg.norm(sigma), influence_matrix
 
         return np.linalg.norm(sigma)

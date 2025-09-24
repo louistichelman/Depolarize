@@ -1,4 +1,6 @@
+import os
 import torch
+import numpy as np
 import torch.nn.functional as F
 import torch.optim as optim
 from collections import deque
@@ -43,6 +45,7 @@ class DQN:
         )  # relevant for non-episodic environments
         self.parallel_envs = kwargs.get("parallel_envs", 1)
         self.td_loss_one_edge = kwargs.get("td_loss_one_edge", False)
+        self.record_opinions_while_training = kwargs.get("record_opinions_while_training", False)
 
         # Create multiple instances of the environment
         if env is not None:
@@ -99,13 +102,13 @@ class DQN:
                 },
             )
 
-    def policy_greedy(self, state, give_q_valaues=False, **kwargs):
+    def policy_greedy(self, state, return_q_values=False, **kwargs):
         """
         Returns the action with the highest Q-value for the given state.
         """
         with torch.no_grad():
             q_values = self.q_network([state]).squeeze()
-        if give_q_valaues:
+        if return_q_values:
             return q_values.argmax().item(), q_values
         return q_values.argmax().item()
 
@@ -163,8 +166,15 @@ class DQN:
         """
         # if we have multiple parallel environments, we keep track of a list of current states, instead of a single state
         states = [self.envs[i].reset() for i in range(self.parallel_envs)]
+        if self.record_opinions_while_training:
+            recorded_opinions = [[] for _ in range(self.parallel_envs)]
 
         for step in range(1, self.timesteps_train + 1):
+            if self.record_opinions_while_training:
+                for i in range(self.parallel_envs):
+                    if states[i]["tau"] is None:
+                        recorded_opinions[i].append(states[i]["sigma"])
+
             self.global_step += 1
             epsilon = self.linear_schedule(
                 self.start_e, self.end_e, self.timesteps_train, step
@@ -216,6 +226,16 @@ class DQN:
 
             if step % self.target_update_freq == 0:
                 self.target_network.load_state_dict(self.q_network.state_dict())
+
+        if self.record_opinions_while_training:
+            # recorded_opinions is assumed to be a list of lists or arrays: [parallel_envs, timesteps, n]
+            recorded_opinions = np.array(recorded_opinions)  # directly to NumPy array
+
+            save_path = os.path.join("results", "dqn", "nonlinear", "runs", self.run_name, "opinions_during_training")
+            os.makedirs(save_path, exist_ok=True)
+
+            np.save(os.path.join(save_path, f"recorded_opinions_dqn_n{self.n}.npy"), recorded_opinions)
+
 
         if self.wandb_init:
             wandb.finish()
