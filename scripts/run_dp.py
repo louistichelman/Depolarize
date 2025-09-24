@@ -16,49 +16,24 @@ from env import FJOpinionDynamicsFinite
 from agents.q_learning import QLearning
 from evaluation import depolarize_optimal, greedy_fj_depolarize, depolarize_using_policy
 
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="Run dynamic programming for FJ-Depolarize"
-    )
-    parser.add_argument(
-        "--n_nodes", type=int, default=3, help="Number of nodes in the graph"
-    )
-    parser.add_argument("--k_steps", type=int, default=2, help="Number of edges to add")
-    parser.add_argument(
-        "--max_edges",
-        type=int,
-        default=None,
-        help="Maximum number of edges in the graph before adding edges",
-    )
-    parser.add_argument(
-        "--training_episodes",
-        type=int,
-        default=100000,
-        help="Number of training episodes for Q-Learning",
-    )
-    parser.add_argument(
-        "--learning_rate", type=float, default=1.0, help="Learning rate for Q-Learning"
-    )
-    args = parser.parse_args()
-
-    # LOAD ENVIRONMENT
-    env_path = f"results/dp/environments/env_n{args.n_nodes}_k{args.k_steps}_maxedges{args.max_edges}.pkl"
+def load_environment(n_nodes, k_steps, max_edges):
+    env_path = f"results/dp/environments/env_n{n_nodes}_k{k_steps}_maxedges{max_edges}.pkl"
     if os.path.exists(env_path):
         print(f"Loading environment from '{env_path}'...")
         with open(env_path, "rb") as f:
             env = pickle.load(f)
     else:
         env = FJOpinionDynamicsFinite(
-            n=args.n_nodes, k=args.k_steps, max_edges=args.max_edges
+            n=n_nodes, k=k_steps, max_edges=max_edges
         )
         os.makedirs(os.path.dirname(env_path), exist_ok=True)
         with open(env_path, "wb") as f:
             pickle.dump(env, f)
         print(f"Environment saved to '{env_path}'.")
+    return env
 
-    # DYNCAMIC PROGRAMMING
-    path = f"results/dp/dynamic_programming_solutions/dp_n{args.n_nodes}_k{args.k_steps}.pkl"
+def dynamic_programming(env, n_nodes, k_steps):
+    path = f"results/dp/dynamic_programming_solutions/dp_n{n_nodes}_k{k_steps}.pkl"
     if os.path.exists(path):
         print(
             f"Dynamic Programming solution already exists at '{path}'. Skipping training."
@@ -81,9 +56,10 @@ def main():
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "wb") as f:
             pickle.dump({"V": V, "pi": pi}, f)
+    return agent_dp
 
-    # Q-LEARNING
-    path = f"results/dp/q_learning_solutions/q_learning_n{args.n_nodes}_k{args.k_steps}_lr{args.learning_rate}_eps{args.training_episodes}.pkl"
+def q_learning(env, n_nodes, k_steps, training_episodes, learning_rate):
+    path = f"results/dp/q_learning_solutions/q_learning_n{n_nodes}_k{k_steps}_lr{learning_rate}_eps{training_episodes}.pkl"
     if os.path.exists(path):
         print(f"Q-Learning solution already exists at '{path}'. Skipping training.")
         with open(path, "rb") as f:
@@ -96,20 +72,21 @@ def main():
         print("Running Q-Learning...")
         start_time = time.time()
         q_table = agent_qlearning.train(
-            n_training_episodes=args.training_episodes,
+            n_training_episodes=training_episodes,
             min_epsilon=0.2,
             max_epsilon=1.0,
             decay_rate=0.000005,
-            learning_rate=args.learning_rate,
+            learning_rate=learning_rate,
         )
         end_time = time.time()
         print(f"Q-Learning finished in {(end_time - start_time) / 60:.2f} minutes.")
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "wb") as f:
             pickle.dump({"Q": q_table}, f)
+    return agent_qlearning
 
-    # OPTIMAL SOLUTIONS
-    path = f"results/dp/optimal_solutions/optimal_solutions_n{args.n_nodes}_k{args.k_steps}.pkl"
+def compute_optimal_solutions(env, n_nodes, k_steps):
+    path = f"results/dp/optimal_solutions/optimal_solutions_n{n_nodes}_k{k_steps}.pkl"
     if os.path.exists(path):
         print(f"Optimal solutions already exist at '{path}'. Skipping computation.")
         with open(path, "rb") as f:
@@ -120,7 +97,7 @@ def main():
         for state in env.starting_states:
             G, sigma, _, _ = env.states[state]
             G_optimal, polarization_optimal = depolarize_optimal(
-                G, sigma, args.k_steps, FJOpinionDynamicsFinite.polarization
+                G, sigma, k_steps, FJOpinionDynamicsFinite.polarization
             )
             optimal_solutions[state] = (G_optimal, polarization_optimal)
 
@@ -128,7 +105,40 @@ def main():
         with open(path, "wb") as f:
             pickle.dump(optimal_solutions, f)
         print(f"Optimal solutions have been saved to '{path}'.")
+    return optimal_solutions
 
+def main():
+    parser = argparse.ArgumentParser(
+        description="Run dynamic programming for FJ-Depolarize"
+    )
+    parser.add_argument(
+        "--n_nodes", type=int, default=6, help="Number of nodes in the graph"
+    )
+    parser.add_argument("--k_steps", type=int, default=3, help="Number of edges to add")
+    parser.add_argument(
+        "--max_edges",
+        type=int,
+        default=6,
+        help="Maximum number of edges in the graph before adding edges",
+    )
+    parser.add_argument(
+        "--training_episodes",
+        type=int,
+        default=4000000,
+        help="Number of training episodes for Q-Learning",
+    )
+    parser.add_argument(
+        "--learning_rate", type=float, default=1.0, help="Learning rate for Q-Learning"
+    )
+    args = parser.parse_args()
+
+    env = load_environment(args.n_nodes, args.k_steps, args.max_edges)
+    agent_dp = dynamic_programming(env, args.n_nodes, args.k_steps)
+    agent_qlearning = q_learning(
+        env, args.n_nodes, args.k_steps, args.training_episodes, args.learning_rate
+    )
+    optimal_solutions = compute_optimal_solutions(env, args.n_nodes, args.k_steps)
+    
     # EVALUATION
     epsilon = 1e-7
     non_optimal_solutions_dp = 0
