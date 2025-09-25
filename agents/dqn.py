@@ -15,15 +15,36 @@ from .q_network.qnet import QNET_REGISTRY
 
 class DQN:
     """
-    Deep Q-Network (DQN) agent for training on graph-based environments.
-    This agent uses a GNN architecture for the Q-network and supports various configurations.
+    Deep Q-Network (DQN) agent for training for Offline and Online Depolarization Problem.
+    Uses a GNN as underlying architecture for the Q-network.
+
+    Arguments:
+    - env: environment instance (BaseEnv) (FJ dynamics or nonlinear model)
+        If None, the agent can only be used for evaluation.
+    - gnn: name of the GNN architecture to use (possible values: GraphSage, GraphormerGD, GCN, GlobalMP)
+    - qnet: name of the Q-network approach to use (possible values: DP, CE)
+    - device: torch device (default: cuda if available, else cpu)
+    - learning_rate: learning rate for the Adam optimizer (default: 0.0004)
+    - gamma: discount factor (default: 1.0)
+    - batch_size: batch size for training (default: 64)
+    - train_freq: frequency (in steps) of training the Q-network (default: 4)
+    - target_update_freq: frequency (in steps) of updating the target network (default: 1000)
+    - timesteps_train: total number of training steps (default: 100000)
+    - wandb_init: whether to initialize a Weights & Biases run (default: True)
+    - start_e: starting value of epsilon for epsilon-greedy exploration (default: 1.0)
+    - end_e: final value of epsilon for epsilon-greedy exploration (default: 1.0, i.e., no exploration)
+    - reset_probability: for non-episodic environments, the probability of resetting the environment at each step (default: None)
+    - parallel_envs: number of parallel environment instances to use (default: 1)
+    - td_loss_one_edge: whether to compute the TD loss as if only one edge is added per step (default: False)
+    - record_opinions_while_training: whether to record the opinions at each step during training (default: False)
+        If True, the opinions are saved in a numpy file in results/dqn/nonlinear/runs/<run_name>/opinions_during_training
     """
 
     def __init__(
         self,
-        env: BaseEnv = None,  # None, if agent only used for evaluation
-        gnn: str = "GraphSage",  # has to be in GNN_REGISTRY
-        qnet: str = "simple",  # has to be in QNET_REGISTRY
+        env: BaseEnv = None,  
+        gnn: str = "GraphSage",
+        qnet: str = "CE",
         **kwargs,
     ):
 
@@ -31,9 +52,9 @@ class DQN:
         self.device = kwargs.get(
             "device", torch.device("cuda" if torch.cuda.is_available() else "cpu")
         )
-        learning_rate = kwargs.get("learning_rate", 0.0008)
+        learning_rate = kwargs.get("learning_rate", 0.0004)
         self.gamma = kwargs.get("gamma", 1.0)
-        self.batch_size = kwargs.get("batch_size", 40)
+        self.batch_size = kwargs.get("batch_size", 64)
         self.train_freq = kwargs.get("train_freq", 4)
         self.target_update_freq = kwargs.get("target_update_freq", 1000)
         self.timesteps_train = kwargs.get("timesteps_train", 100000)

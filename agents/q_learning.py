@@ -21,14 +21,13 @@ class QLearning:
         n_training_episodes=10000,
         min_epsilon=0.05,
         max_epsilon=1.0,
-        decay_rate=0.0005,
         learning_rate=0.07,
+        take_snapshots_every=None,
     ):
+        q_table_snapshots = [self.q_table.copy()]
         for episode in range(n_training_episodes):
             # Reduce epsilon (because we need less and less exploration)
-            epsilon = min_epsilon + (max_epsilon - min_epsilon) * np.exp(
-                -decay_rate * episode
-            )
+            epsilon = min_epsilon + (max_epsilon - min_epsilon) * episode / n_training_episodes
 
             state = self.env.reset()
 
@@ -48,4 +47,8 @@ class QLearning:
                 if terminal:
                     break
                 state = new_state
+            if take_snapshots_every is not None and episode % take_snapshots_every == 0:
+                q_table_snapshots.append(self.q_table.copy())
+        if take_snapshots_every is not None:
+            return self.q_table, q_table_snapshots
         return self.q_table

@@ -20,13 +20,20 @@ class FJOpinionDynamics(BaseEnv):
     - 'tau': the node that is currently being considered for rewiring (or None) (int or None)
     - 'edges_left': the number of edges that can still be added (int)
     - 'polarization': the current polarization of the network (float)
-    - 'influence_matrix': the influence matrix of the network (numpy.ndarray)
+    - 'influence_matrix': the fundamental matrix of the network (numpy.ndarray)
     - 'graph_data': the graph data in PyTorch Geometric format (torch_geometric.utils.data.Data)
 
     The actions are node indices.
+
+    Arguments:
+    - n: number of nodes in the graph (int)
+    - start_states: path to a file containing a list of start states (str)
+    - average_degree: average degree of the graph (int, default=6)
+    - k: number of edges that can be changed in one episode (int, default=n//10)
+    - keep_resistance_matrix: whether to keep the resistance matrix instead of the fundamental matrix in the state representation (useful for training Graphormer-GD) (bool, default=False)
     """
 
-    def __init__(self, n=None, start_states=None, **kwargs):
+    def __init__(self, n: int = None, start_states: str = None, **kwargs):
         super().__init__()
 
         if start_states is not None:
@@ -43,7 +50,7 @@ class FJOpinionDynamics(BaseEnv):
 
         self.current_state = None
 
-    def _load_start_states(self, file_path):
+    def _load_start_states(self, file_path: str):
         """
         Load start states from a file.
         """
@@ -54,7 +61,7 @@ class FJOpinionDynamics(BaseEnv):
     def reset(self):
         """
         Resets the environment to a random state. We use a Watts-Strogatz graph
-        and initial opinions are chosen uniformly from [-1, 1].
+        and initial opinions are chosen uniformly from [-1, 1], if no start states are provided.
         Returns: current_state
         """
         if hasattr(self, "start_states"):
@@ -85,7 +92,7 @@ class FJOpinionDynamics(BaseEnv):
 
         return self.current_state.copy()
 
-    def is_terminal(self, state=None):
+    def is_terminal(self, state: dict = None):
         """
         Returns True if the state is terminal, False otherwise.
         """
@@ -93,7 +100,7 @@ class FJOpinionDynamics(BaseEnv):
             self.current_state = state
         return state["edges_left"] == 0
 
-    def step(self, action, state=None):
+    def step(self, action: int, state: dict = None):
         """
         Given the current state (or given state) and an action, performs a step in the environment.
         Returns the next state, reward, and whether the state is terminal.
@@ -145,7 +152,7 @@ class FJOpinionDynamics(BaseEnv):
 
     @staticmethod
     def polarization(
-        G, sigma, return_influence_matrix=False, keep_resistance_matrix=False
+        G: nx.Graph, sigma: np.ndarray, return_influence_matrix: bool = False, keep_resistance_matrix: bool = False
     ):
         """
         Returns the polarization of a network.

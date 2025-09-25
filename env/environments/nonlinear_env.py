@@ -21,9 +21,24 @@ class NLOpinionDynamics(BaseEnv):
     - 'graph_data': the graph data in PyTorch Geometric format (torch_geometric.utils.data.Data)
 
     The actions are node indices.
+
+    The environment parameters include:
+    - n: number of nodes in the graph
+    - average_degree: average degree of the graph
+    - n_edge_updates_per_step: number of edge updates per step in the opinion dynamics
+    - lam: decay factor for opinions
+    - kappa: social influence factor for opinion updates
+    - alpha: scaling factor for influence in opinion updates ("controversy")
+    - beta: scaling factor for opinion range in influence calculation ("negative influence")
+    - gamma: exponent for rewiring probabilities ("homophily")
+
+    Other arguments:
+    - keep_influence_matrix: whether to store the influence matrix in the state (for training Graphormer-GD)
+    - keep_resistance_matrix: whether to store the resistance matrix in the state (for training Graphormer-GD)
+    - start_states: path to a file with predefined start states (if None, random states are generated)
     """
 
-    def __init__(self, n=None, start_states=None, **kwargs):
+    def __init__(self, n: int = None, start_states: str = None, **kwargs):
         super().__init__()
 
         self.keep_influence_matrix = kwargs.get("keep_influence_matrix", False)
@@ -52,7 +67,7 @@ class NLOpinionDynamics(BaseEnv):
 
         self.current_state = None
 
-    def _load_start_states(self, file_path):
+    def _load_start_states(self, file_path: str):
         """
         Load start states from a file.
         """
@@ -63,7 +78,7 @@ class NLOpinionDynamics(BaseEnv):
     def reset(self):
         """
         Resets the environment to a random state. We use a Watts-Strogatz graph
-        and initial opinions are chosen uniformly from [-5, 5].
+        and initial opinions are chosen uniformly from [-5, 5], if no start states are provided.
         Returns: current_state
         """
         if hasattr(self, "start_states"):
@@ -101,7 +116,7 @@ class NLOpinionDynamics(BaseEnv):
 
         return self.current_state.copy()
 
-    def step(self, action, state=None):
+    def step(self, action: int, state: dict = None):
         """
         Given the current state (or given state) and an action, performs a step in the environment.
         Returns the next state, reward, and whether the state is terminal.
@@ -155,7 +170,7 @@ class NLOpinionDynamics(BaseEnv):
                 False,  # no states are terminal in this environment
             )
 
-    def opinion_dynamics(self, G, sigma):
+    def opinion_dynamics(self, G: nx.Graph, sigma: np.ndarray):
         """
         Performs one step of opinion dynamics according to the nonlinear model.
         Returns the updated graph and opinions.
@@ -169,7 +184,7 @@ class NLOpinionDynamics(BaseEnv):
         sigma = self.opinion_updates(G, sigma)
         return G, sigma
 
-    def opinion_updates(self, G, sigma):
+    def opinion_updates(self, G: nx.Graph, sigma: np.ndarray):
         """
         Updates the opinions according to the nonlinear opinion dynamics model.
         Returns the updated opinions.
@@ -195,7 +210,7 @@ class NLOpinionDynamics(BaseEnv):
 
         return new_sigma
 
-    def social_rewiring(self, G, sigma, node):
+    def social_rewiring(self, G: nx.Graph, sigma: np.ndarray, node: int):
         """
         Performs social rewiring for a given node according to the nonlinear model.
         This involves either removing a neighbor or adding a new connection.
@@ -247,10 +262,10 @@ class NLOpinionDynamics(BaseEnv):
 
     @staticmethod
     def polarization(
-        G, sigma, keep_influence_matrix=False, keep_resistance_matrix=False
+        G: nx.Graph, sigma: np.ndarray, keep_influence_matrix: bool = False, keep_resistance_matrix: bool = False
     ):
         """
-        Returns the polarization of the network (only depends on sigma).
+        Returns the polarization of the network and optionally the influence or resistance matrix used for training Graphormer-GD.
         """
         if keep_influence_matrix:
 

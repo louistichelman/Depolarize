@@ -7,7 +7,7 @@ class BaseGNN(torch.nn.Module, ABC):
     Base class for the underlying GNN architecture used in the Q-network.
     """
 
-    def __init__(self, embed_dim, **kwargs):
+    def __init__(self, embed_dim: int, **kwargs):
         super().__init__()
         self.device = kwargs.get(
             "device", torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -15,7 +15,7 @@ class BaseGNN(torch.nn.Module, ABC):
         self.embed_dim = embed_dim
         self.num_heads = None
 
-    def forward(self, raw_states):
+    def forward(self, raw_states: list[dict]):
         """
         raw_states: list of environment states (dicts) with keys:
             - "graph": networkx graph object
@@ -30,7 +30,7 @@ class BaseGNN(torch.nn.Module, ABC):
         return self.forward_batch(batch)
 
     @abstractmethod
-    def prepare_batch(self, raw_states):
+    def prepare_batch(self, raw_states: list[dict]):
         """
         Converts a list of environment states into a batched format
         suitable for forward_batch.

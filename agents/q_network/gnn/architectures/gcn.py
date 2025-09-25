@@ -11,7 +11,7 @@ class GCN(BaseGNN):
     Layers are defined using GCNConv from PyTorch Geometric.
     """
 
-    def __init__(self, embed_dim=64, num_layers=4, **kwargs):
+    def __init__(self, embed_dim: int = 128, num_layers: int = 4, **kwargs):
         super().__init__(embed_dim, **kwargs)
         self.input_layer = GCNConv(3, embed_dim)
         self.layers = torch.nn.ModuleList(
@@ -19,7 +19,7 @@ class GCN(BaseGNN):
         )
         self.to(self.device)
 
-    def prepare_batch(self, raw_states):
+    def prepare_batch(self, raw_states: list[dict]):
         data_list = []
         for state in raw_states:
             data = state["graph_data"]
@@ -51,7 +51,7 @@ class GCN(BaseGNN):
 
         return Batch.from_data_list(data_list).to(self.device)
 
-    def forward_batch(self, batch):
+    def forward_batch(self, batch: Batch):
         x, edge_index = batch.x, batch.edge_index
 
         x = F.relu(self.input_layer(x, edge_index))

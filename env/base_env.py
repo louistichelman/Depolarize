@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import copy
 import igraph as ig
 import networkx as nx
-
+from collections.abc import Iterable
 
 class BaseEnv(ABC):
     """
@@ -44,7 +44,7 @@ class BaseEnv(ABC):
         return copy.deepcopy(self)
 
     @staticmethod
-    def state_hash(G, sigma, tau = None, action=None, return_permuted_tuple=False):
+    def state_hash(G: nx.Graph, sigma: Iterable, tau: int = None, action: int = None, return_permuted_tuple: bool = False):
         """
         Returns a canonical representation of (G, sigma, tau) using igraph canonical_permutation.
         """

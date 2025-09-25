@@ -19,9 +19,19 @@ class FJOpinionDynamicsFinite(BaseEnv):
     - sigma is the vector of opinions of agents. (list of -1, 1)
     - tau is the node that is currently being considered for rewiring (or None). (int or None)
     - l is the number of edges that we already added in this episode. (int)
+
+    We work with indices of states, which are integers in [0, number of states - 1].
+    The actions are node indices.
+
+    Arguments:
+    - n: number of nodes in the graph (int)
+    - k: number of edges that can be changed in one episode (int, default=2)
+    - max_edges: maximum number of edges that we allow in a graph (before adding edges) 
+      mainly used to reduce the number of states
+    - generate_states: whether to generate all unique states (G, sigma, tau, l) up to isomorphism (bool, default=True)
     """
 
-    def __init__(self, n, k=2, max_edges=None, generate_states=True):
+    def __init__(self, n: int, k: int = 2, max_edges: int = None, generate_states: bool = True):
         super().__init__()
         self.n = n
         self.k = k
@@ -113,7 +123,7 @@ class FJOpinionDynamicsFinite(BaseEnv):
         ]
         return self.current_state
 
-    def is_terminal(self, state=None):
+    def is_terminal(self, state: int = None):
         """
         Returns True if the state is terminal, False otherwise.
         """
@@ -122,7 +132,7 @@ class FJOpinionDynamicsFinite(BaseEnv):
         _, _, _, l = self.states[state]
         return l == self.k  # the state is terminal if we have added k edges
 
-    def step(self, action, state=None):
+    def step(self, action: int, state: int = None):
         """
         Given the current state (or given state) and an action, performs a step in the environment.
         Returns the next state, reward, and whether the state is terminal.
@@ -166,7 +176,7 @@ class FJOpinionDynamicsFinite(BaseEnv):
             return new_state, polarization_old - polarization_new, terminal
 
     @staticmethod
-    def polarization(G, sigma):
+    def polarization(G: nx.Graph, sigma: np.ndarray):
         """
         Returns the polarization of a network.
         """

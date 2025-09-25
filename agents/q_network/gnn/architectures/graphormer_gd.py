@@ -5,14 +5,13 @@ import math
 from ..base_gnn import BaseGNN
 
 
-class Graphormer(BaseGNN):
+class GraphormerGD(BaseGNN):
     """
-    Custom Graph-Transformer implementation for the Q-network. The fundamental matrix (influence matrix) used in the
-    FJ opinion dynamics is used to inject influence into the attention mechanism.
-    Number of parameters: 2 * num_layers * embed_dim^2 + (4+num_layers) * embed_dim
+    Custom Implementation of Graphormer-GD from the paper https://arxiv.org/pdf/2301.09505
+    Adapted for the Q-network in this project.
     """
 
-    def __init__(self, embed_dim=64, num_layers=3, num_heads=4, **kwargs):
+    def __init__(self, embed_dim: int = 128, num_layers: int = 4, num_heads: int = 4, **kwargs):
         super().__init__(embed_dim, **kwargs)
 
         self.input_proj = nn.Linear(in_features=3, out_features=embed_dim, bias=True)
@@ -24,7 +23,7 @@ class Graphormer(BaseGNN):
 
         self.to(self.device)
 
-    def prepare_batch(self, raw_states):
+    def prepare_batch(self, raw_states: list[dict]):
         xs = []  # node features
         influences = []  # influence matrices
 
@@ -77,7 +76,7 @@ class Graphormer(BaseGNN):
 
 
 class GraphormerLayer(nn.Module):
-    def __init__(self, embed_dim, num_heads):
+    def __init__(self, embed_dim: int, num_heads: int):
         super().__init__()
         self.attn = GraphormerAttention(embed_dim, num_heads)
 
@@ -86,9 +85,6 @@ class GraphormerLayer(nn.Module):
             nn.ReLU(),
             nn.Linear(embed_dim, embed_dim),
         )
-
-        # self.dropout1 = nn.Dropout(0.1)
-        # self.dropout2 = nn.Dropout(0.1)
 
         self.norm1 = nn.LayerNorm(embed_dim)
         self.norm2 = nn.LayerNorm(embed_dim)
@@ -103,7 +99,7 @@ class GraphormerLayer(nn.Module):
 
 
 class GraphormerAttention(nn.Module):
-    def __init__(self, embed_dim, num_heads):
+    def __init__(self, embed_dim: int, num_heads: int):
         super().__init__()
         self.embed_dim = embed_dim
         self.num_heads = num_heads
@@ -124,7 +120,7 @@ class GraphormerAttention(nn.Module):
         self.influence_weight_2 = nn.Parameter(torch.tensor(1.0))
         self.influence_bias_2 = nn.Parameter(torch.tensor(0.0))
 
-    def forward(self, x, influence_matrix):
+    def forward(self, x: torch.Tensor, influence_matrix: torch.Tensor):
 
         B, N, _ = x.size()
 

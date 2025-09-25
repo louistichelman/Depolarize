@@ -1,8 +1,8 @@
 # qnets/approaches.py
-from .architectures.complex_qnet import ComplexQNetwork
-from .architectures.simple_qnet import SimpleQNetwork
+from .architectures.combining_embeddings_qnet import CE_QNetwork
+from .architectures.direct_projection_qnet import DP_QNetwork
 
 QNET_REGISTRY = {
-    "complex": ComplexQNetwork,
-    "simple": SimpleQNetwork,
+    "CE": CE_QNetwork,
+    "DP": DP_QNetwork,
 }

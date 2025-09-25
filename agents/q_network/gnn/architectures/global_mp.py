@@ -5,18 +5,15 @@ from torch_geometric.utils import to_dense_adj
 from ..base_gnn import BaseGNN
 
 
-class GlobalGNN(BaseGNN):
+class GlobalMP(BaseGNN):
     """
-    Custom "Global GNN" implementation for the Q-network.
+    Custom "GlobalMP" implementation for the Q-network.
     This architecture uses a global convolutional layer to aggregate information,
-    i.e. in each layer, each node receives messages from all other nodes in the graph.
-    To enable communication between all nodes, we compute the 'full_edge_index', i.e. the edge index
-    of a complete graph. To keep track of which nodes are neighbors, we also compute an 'is_neighbor' mask.
-
-    Number of parameters: 3 * num_layers * embed_dim^2 + (4+num_layers) * embed_dim
+    i.e. in each layer, each node receives messages from all other nodes in the graph
+    (with different weights for neighbors and non-neighbors).
     """
 
-    def __init__(self, embed_dim=64, num_layers=4, **kwargs):
+    def __init__(self, embed_dim: int = 128, num_layers: int = 4, **kwargs):
         super().__init__(embed_dim, **kwargs)
         self.input_layer = GlobalConv(in_channels=3, hidden_channels=embed_dim)
         self.layers = nn.ModuleList(
@@ -27,7 +24,7 @@ class GlobalGNN(BaseGNN):
         )
         self.to(self.device)
 
-    def prepare_batch(self, raw_states):
+    def prepare_batch(self, raw_states: list[dict]):
         xs = []
         adjacency_matrices = []
 
@@ -69,7 +66,7 @@ class GlobalGNN(BaseGNN):
 
         return (x_tensor, adjacency_tensor)
 
-    def forward_batch(self, batch):
+    def forward_batch(self, batch: tuple[torch.Tensor, torch.Tensor]):
         x_tensor, adjacency_tensor = batch
         B, n_nodes, _ = x_tensor.shape
 
@@ -88,7 +85,7 @@ class GlobalConv(nn.Module):
     and a separate linear layer for self features.
     """
 
-    def __init__(self, in_channels, hidden_channels):
+    def __init__(self, in_channels: int, hidden_channels: int):
         super().__init__()
 
         # For neighbor messages
@@ -98,7 +95,7 @@ class GlobalConv(nn.Module):
         # For self features
         self.lin_self = nn.Linear(in_channels, hidden_channels)
 
-    def forward(self, x, adj):
+    def forward(self, x: torch.Tensor, adj: torch.Tensor):
         # x: [B, N, D], adj: [B, N, N]
         B, N, _ = x.shape
         I = torch.eye(N, device=x.device).unsqueeze(0).expand(B, -1, -1)

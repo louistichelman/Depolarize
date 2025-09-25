@@ -1,15 +1,22 @@
 import torch
 from torch_geometric.nn import global_mean_pool
 import torch.nn.functional as F
-from ..base_qnet import BaseQNetwork
+from ..base_qnet import BaseQNetwork, BaseGNN
 
 
-class ComplexQNetwork(BaseQNetwork):
-    def __init__(self, model):
+class CE_QNetwork(BaseQNetwork):
+    """
+    Q-network that combines node embeddings of start- and endnode and graph-level embeddings
+    to compute Q-values.
+
+    Arguments:
+    - model: the GNN backbone (instance of subclass of BaseGNN)
+    """
+        
+    def __init__(self, model: BaseGNN):
         super().__init__(model)
         self.device = self.model.device
         embed_dim = self.model.embed_dim
-        # self.set2set = Set2Set(embed_dim, processing_steps=3)
 
         self.linear_no_tau = torch.nn.Linear(2 * embed_dim, embed_dim)
         self.projection_no_tau = torch.nn.Linear(embed_dim, 1)
@@ -18,7 +25,8 @@ class ComplexQNetwork(BaseQNetwork):
         self.projection_with_tau = torch.nn.Linear(embed_dim, 1)
         self.to(self.device)
 
-    def compute_q_values(self, node_embeddings, raw_states, batch):
+    def compute_q_values(self, node_embeddings: torch.Tensor, raw_states: list[dict], batch: torch.Tensor):
+        
         graph_emb = global_mean_pool(node_embeddings, batch)
         graph_emb = graph_emb[batch]  # broadcast to [N, embed_dim]
 
