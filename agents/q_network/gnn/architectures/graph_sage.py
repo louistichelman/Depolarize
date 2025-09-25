@@ -9,10 +9,9 @@ class GraphSAGE(BaseGNN):
     """
     GraphSAGE implementation for the Q-network.
     Layers are defined using SAGEConv from PyTorch Geometric.
-    Number of parameters:
     """
 
-    def __init__(self, embed_dim=64, num_layers=4, **kwargs):
+    def __init__(self, embed_dim: int = 128, num_layers: int = 4, **kwargs):
         super().__init__(embed_dim, **kwargs)
         self.input_layer = SAGEConv(3, embed_dim)
         self.layers = torch.nn.ModuleList(
