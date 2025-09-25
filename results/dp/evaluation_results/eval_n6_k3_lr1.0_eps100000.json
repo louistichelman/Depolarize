@@ -1,1 +1,0 @@
-{"non_optimal_solutions_dp": 0, "non_optimal_solutions_qlearning": 2223, "non_optimal_solutions_greedy": 3061, "average_polarization_dp": 0.9473555892380819, "average_polarization_qlearning": 0.9633791306445971, "average_polarization_greedy": 0.9542999918402402, "n_nodes": 6, "k_steps": 3, "max_edges": null, "training_episodes": 100000, "learning_rate": 1.0}
