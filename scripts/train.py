@@ -21,7 +21,9 @@ from visualization import (
     visualize_variance_ood_n,
     visualize_dqn_vs_greedy,
     performance_overview,
-    visualize_polarization_development_multiple_policies,
+    visualize_polarization_development_dqn_and_baselines,
+    analyze_actions,
+    visualize_graph_metrics
 )
 
 
@@ -191,9 +193,11 @@ def evaluate_run_fj_depolarize(run_name, n_values, k_values, n, k, folder="val")
 
 def evaluate_run_nonlinear(run_name, n_values, n_steps=20000, folder="val"):
     test_and_save_policy_dqn(run_name, n_values, n_steps=n_steps, folder=folder)
-    visualize_polarization_development_multiple_policies(
+    visualize_polarization_development_dqn_and_baselines(
         run_name=run_name, folder=folder
-    )    
+    )
+    analyze_actions(run_name=run_name, folder=folder)
+    visualize_graph_metrics(run_name=run_name, folder=folder)
 
 
 def main():
@@ -428,8 +432,8 @@ def main():
     }
 
     # Run training
-    run_name = run_training(params_env=params_env, params_agent=params_agent)
-    # run_name = "Graphormer-complex-n10-k3-hd128-layers4-lr0.0004-heads4-bs64-p1-g1.0-tuf100000-EQBEB"
+    # run_name = run_training(params_env=params_env, params_agent=params_agent)
+    run_name = "GraphSage-complex-n150-k0-hd128-layers4-lr0.0001-heads0-bs64-p1-g0.8-tuf4000-SRLWZ"
     # visualize_variance_ood_n_simple(run_name, folder=args.folder)
     # continue_training(run_name=run_name, timesteps_train=args.timesteps_train)
     if args.number_of_reruns is not None:

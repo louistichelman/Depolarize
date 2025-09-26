@@ -1,16 +1,50 @@
-import numpy as np
+"""
+Flat Q-Learning for FJ-OffDP
+----------------------------
 
+This module implements a tabular Q-learning algorithm for the finite Markov 
+Decision Process (MDP) formulation of the Offline Depolarization Problem (OffDP) 
+under the Friedkin–Johnsen (FJ) opinion dynamics model.
+
+Unlike dynamic programming, Q-learning does not require explicit knowledge of 
+the transition probabilities and can instead learn directly from simulated 
+environment interactions. This makes it a useful stepping stone toward 
+scalable reinforcement learning approaches for larger networks.
+
+This implementation is limited to small graph instances, where the state space 
+can still be enumerated explicitly.
+"""
+
+import numpy as np
+from env import FJOpinionDynamicsFinite
 
 class QLearning:
-    def __init__(self, env, gamma=1.0):
+    """
+    Tabular Q-learning agent for the finite FJ-OffDP MDP.
+
+    Parameters
+    ----------
+    env : FJOpinionDynamicsFinite
+        Finite environment defining states, actions, and transitions.
+    gamma : float, default=1.0
+        Discount factor for future rewards.
+
+    """
+    def __init__(self, env: FJOpinionDynamicsFinite, gamma: float = 1.0):
         self.env = env
         self.q_table = np.zeros((len(env.states), len(env.actions)))
         self.gamma = gamma
 
     def policy_greedy(self, state):
+        """
+        Returns the action with the highest Q-value at the given state.
+        """
         return np.argmax(self.q_table[state][:])
 
     def policy_greedy_epsilon(self, state, epsilon):
+        """
+        Chooses an action using ε-greedy exploration.
+        """
         if np.random.rand() > epsilon:
             return self.policy_greedy(state)
         else:
@@ -24,6 +58,22 @@ class QLearning:
         learning_rate=0.07,
         take_snapshots_every=None,
     ):
+        """
+        Train the Q-learning agent using ε-greedy exploration.
+
+        Parameters
+        ----------
+        n_training_episodes : int, default=10000
+            Number of training episodes.
+        min_epsilon : float, default=0.05
+            Minimum exploration probability.
+        max_epsilon : float, default=1.0
+            Maximum exploration probability.
+        learning_rate : float, default=0.07
+            Learning rate for Q-learning updates.
+        take_snapshots_every : int, optional
+            If specified, take snapshots of the Q-table every N episodes.
+        """
         q_table_snapshots = [self.q_table.copy()]
         for episode in range(n_training_episodes):
             # Reduce epsilon (because we need less and less exploration)

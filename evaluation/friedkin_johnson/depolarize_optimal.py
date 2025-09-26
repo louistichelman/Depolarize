@@ -1,7 +1,44 @@
-from env import BaseEnv
+"""
+Exact Solver for FJ-OffDP (Exhaustive Search)
+---------------------------------------------
 
+This module implements an exhaustive search for the Offline Depolarization Problem (OffDP) 
+under the Friedkin–Johnsen (FJ) model. It evaluates all possible sequences of up to k edge 
+modifications (additions or deletions) and returns the configuration with minimum polarization.
 
-def depolarize_optimal(G, sigma, k, polarization_function):
+Notes:
+- Runtime grows exponentially in k and |V|; practical only for very small graphs.
+- Used in the thesis to provide optimal benchmarks for evaluating heuristics 
+  and the greedy algorithm on toy-sized instances.
+"""
+
+from collections.abc import Iterable
+import networkx as nx
+
+def depolarize_optimal(G: nx.Graph, sigma: Iterable, k: int, polarization_function: callable) -> tuple[nx.Graph, float]:
+    """
+    Finds the optimal graph configuration for polarization minimization under
+    given polarization_function after up to k edge modifications using exhaustive search.
+
+    Parameters
+    ----------
+    G : networkx.Graph
+        Input undirected, unweighted graph.
+    sigma : np.ndarray
+        Initial opinion vector.
+    k : int
+        Number of edge modifications allowed (budget).
+    polarization_function : callable
+        Function that computes polarization for (G, sigma).
+
+    Returns
+    ----------
+    best_G : networkx.Graph
+        Graph configuration achieving the lowest polarization.
+    min_polarization : float
+        Corresponding polarization value.
+
+    """
     min_polarization = float("inf")
     best_G = None
 

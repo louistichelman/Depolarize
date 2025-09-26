@@ -1,3 +1,24 @@
+"""
+NLOpinionDynamics Environment
+-----------------------------
+
+This file defines the NLOpinionDynamics environment, an implementation of a
+nonlinear opinion dynamics model as a Markov Decision Process (MDP).
+
+Key features:
+- Represents states as dictionaries containing graph structure, opinions,
+  current polarization, and auxiliary matrices.
+- Simulates nonlinear opinion dynamics with opinion updates and social rewiring.
+- Allows interventions by adding/removing edges based on agent actions.
+- Supports optional computation of influence and resistance matrices for
+  use in training GNN-based agents (e.g., Graphormer-GD).
+- No terminal states: the environment models ongoing opinion evolution.
+
+This environment is used to evaluate reinforcement learning–based approaches
+to network depolarization in dynamic, nonlinear settings.
+"""
+
+
 import numpy as np
 import networkx as nx
 from torch_geometric.utils import from_networkx
@@ -20,22 +41,35 @@ class NLOpinionDynamics(BaseEnv):
     - 'polarization': the current polarization of the network (float)
     - 'graph_data': the graph data in PyTorch Geometric format (torch_geometric.utils.data.Data)
 
-    The actions are node indices.
-
-    The environment parameters include:
-    - n: number of nodes in the graph
-    - average_degree: average degree of the graph
-    - n_edge_updates_per_step: number of edge updates per step in the opinion dynamics
-    - lam: decay factor for opinions
-    - kappa: social influence factor for opinion updates
-    - alpha: scaling factor for influence in opinion updates ("controversy")
-    - beta: scaling factor for opinion range in influence calculation ("negative influence")
-    - gamma: exponent for rewiring probabilities ("homophily")
-
-    Other arguments:
-    - keep_influence_matrix: whether to store the influence matrix in the state (for training Graphormer-GD)
-    - keep_resistance_matrix: whether to store the resistance matrix in the state (for training Graphormer-GD)
-    - start_states: path to a file with predefined start states (if None, random states are generated)
+    Parameters
+    ----------
+    n : int, optional
+        Number of nodes in the graph. Required if start_states is not provided.
+    start_states : str, optional
+        Path to a file containing pre-saved start states. If provided, n is ignored.
+    average_degree : int, optional
+        Average degree of the generated Watts-Strogatz graph (default: 6).
+    k : int, optional
+        Number of edge modifications allowed (budget). Default is n // 10.
+    keep_influence_matrix : bool, optional
+        If True, the influence matrix is kept in the state. Used for training Graphormer-GD.
+        Default is False.
+    keep_resistance_matrix : bool, optional
+        If True, the resistance matrix is kept in the influence_matrix field, used for training Graphormer-GD.
+        Default is False.
+    Model parameters
+    lam : float, optional
+        Self-persistence parameter in opinion updates (default: 0.999).
+    kappa : float, optional
+        Social influence scaling parameter in opinion updates (default: 0.01).
+    alpha : float, optional
+        "controversy" parameter in opinion updates (default: 0.2).
+    beta : float, optional
+        "negative influence" parameter in opinion updates (default: 1).
+    gamma : float, optional
+        "homophily" parameter in social rewiring (default: 0.6).
+    n_edge_updates_per_step : int, optional
+        Number of nodes to update (rewire opinions) per step (default: n // 40).
     """
 
     def __init__(self, n: int = None, start_states: str = None, **kwargs):

@@ -1,3 +1,43 @@
+"""
+Dataset Generation for DQN Experiments
+--------------------------------------
+
+This script generates training, validation, and test start states for 
+depolarization experiments under either:
+    - The FJ-OffDP, FJOpinionDynamics environment
+    - The NL-OnDP, NonlinearOpinionDynamics environment
+
+Functionality:
+- Uses the environment registry (ENVIRONMENT_REGISTRY) to instantiate the chosen env.
+- Randomly generates unique start states (graph + opinion vector + other env info).
+- Ensures no duplicate states (via state_hash).
+- Saves datasets as PyTorch `.pt` files in `data/{env}/train`, `val`, and `test`.
+- Optionally generates out-of-distribution (OOD) datasets for different graph sizes.
+
+Dataset structure:
+    data/
+      friedkin-johnson/ or nonlinear/
+        train/start_states_train_n{n}_d{degree}.pt
+        val/start_states_val_n{n}_d{degree}.pt
+        test/start_states_test_n{n}_d{degree}.pt
+        (optional OOD splits saved in val/ and test/)
+
+Usage:
+--env: Environment type ("friedkin-johnson" or "nonlinear").
+--n: Graph size for in-distribution datasets.
+--average_degree: Average degree of generated graphs.
+--n_train: Number of training states to generate.
+--n_val: Number of validation states to generate.
+--n_test: Number of testing states to generate.
+--out_of_distribution_n: List of graph sizes for OOD test/val states.
+--seed: Random seed for reproducibility.
+
+Notes:
+- Files are stored in PyTorch tensor format (`.pt`).
+- Generated datasets are used as start states for DQN training and evaluation.
+"""
+
+
 #!/usr/bin/env python3
 import argparse
 import os
@@ -15,7 +55,7 @@ from env import ENVIRONMENT_REGISTRY, BaseEnv
 
 def generate_random_states(env: BaseEnv, num_states: int = 150, seen: set = None):
     """
-    Generate random test states for the given environment environment.
+    Generate random test states for the given environment.
     """
     if seen is None:
         seen = set()
@@ -111,7 +151,7 @@ def main():
         ),
     )
 
-    print(f"✅ Saved {len(start_states_train)} start states to {save_path}")
+    print(f"Saved {len(start_states_train)} start states to {save_path}")
 
 
     start_states_val, seen = generate_random_states(
@@ -127,7 +167,7 @@ def main():
         ),
     )
 
-    print(f"✅ Saved {len(start_states_val)} start states to {save_path}")
+    print(f"Saved {len(start_states_val)} start states to {save_path}")
 
     start_states_test, _ = generate_random_states(
         env, num_states=args.n_test, seen=seen
@@ -142,7 +182,7 @@ def main():
         ),
     )
 
-    print(f"✅ Saved {len(start_states_test)} start states to {save_path}")
+    print(f"Saved {len(start_states_test)} start states to {save_path}")
 
     if args.out_of_distribution_n is not None:
         print(f"Generating OOD test states ...")
@@ -168,7 +208,7 @@ def main():
                 ),
             )
 
-        print(f"✅ Saved OOD val and test states to {env_dir}")
+        print(f"Saved OOD val and test states to {env_dir}")
 
 
 if __name__ == "__main__":

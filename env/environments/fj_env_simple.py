@@ -1,3 +1,19 @@
+"""
+Finite Environment for FJ-OffDP
+-------------------------------
+
+This module implements a finite Markov Decision Process (MDP) environment for the 
+Offline Depolarization Problem (OffDP) under the Friedkin–Johnsen (FJ) opinion dynamics model.
+
+The environment enumerates all unique states up to graph isomorphism, which makes it suitable 
+for exact dynamic programming and tabular Q-learning approaches. Each state encodes a network, 
+an opinion configuration, the current rewiring context, and the number of edge modifications 
+already performed. Rewards correspond to reductions in polarization. 
+
+Due to the combinatorial explosion of states, this finite construction is only feasible for 
+small graphs and is mainly used as a theoretical tool in Chapter 5.2 of the thesis.
+"""
+
 import numpy as np
 import itertools
 import networkx as nx
@@ -9,26 +25,24 @@ from ..base_env import BaseEnv
 
 class FJOpinionDynamicsFinite(BaseEnv):
     """
-    Environment for optimizing polarization reduction under the FJ opinion dynamics model.
-    This environment generates all unique states (G, sigma, tau, l) up to isomorphism, which is
-    necessary for dynamic programming approaches.
-    For big n however, this becomes computationally expensive, which is why we use 'FJOpinionDynamics' for larger n.
+    Finite MDP environment for the FJ-OffDP. 
 
-    The state is represented as a tuple (G, sigma, tau, l) where:
-    - G is the graph (network) of agents. (networkx.Graph)
-    - sigma is the vector of opinions of agents. (list of -1, 1)
-    - tau is the node that is currently being considered for rewiring (or None). (int or None)
-    - l is the number of edges that we already added in this episode. (int)
+    States are represented as (G, sigma, tau, l), where:
+      - G : networkx.Graph, current social network
+      - sigma : list of int, opinion vector in {-1, 1}
+      - tau : int or None, currently selected node for rewiring
+      - l : int, number of applied edge modifications
 
-    We work with indices of states, which are integers in [0, number of states - 1].
-    The actions are node indices.
-
-    Arguments:
-    - n: number of nodes in the graph (int)
-    - k: number of edges that can be changed in one episode (int, default=2)
-    - max_edges: maximum number of edges that we allow in a graph (before adding edges) 
-      mainly used to reduce the number of states
-    - generate_states: whether to generate all unique states (G, sigma, tau, l) up to isomorphism (bool, default=True)
+    Parameters
+    ----------
+    n : int
+        Number of nodes in the graph.
+    k : int, default=2
+        Budget of allowed edge modifications per episode.
+    max_edges : int, optional
+        Maximum number of edges allowed before interventions (to limit state space).
+    generate_states : bool, default=True
+        Whether to precompute all unique states up to isomorphism.
     """
 
     def __init__(self, n: int, k: int = 2, max_edges: int = None, generate_states: bool = True):
@@ -46,15 +60,19 @@ class FJOpinionDynamicsFinite(BaseEnv):
                 self._generate_states()
             )
             self.state_idxes = list(range(len(self.states)))
+
         self.actions = list(range(self.n))
-        current_state = None
+
 
     def _generate_states(self):
         """
         Generates all unique states (G, sigma, tau, l) up to isomorphism and returns
-        - states: a list of tuples (G, sigma, tau, l)
-        - hash_to_index: a dictionary mapping (state_hash, l) to index in states
-        - starting_states: a list of indices of starting states
+
+        Returns
+        -------
+        states: a list of tuples (G, sigma, tau, l)
+        hash_to_index: a dictionary mapping (state_hash, l) to index in states
+        starting_states: a list of indices of starting states
         """
         all_edges = list(itertools.combinations(range(self.n), 2))
 
@@ -117,6 +135,11 @@ class FJOpinionDynamicsFinite(BaseEnv):
     def reset(self):
         """
         Resets the current state to a random starting state.
+
+        Returns
+        -------
+        state: int
+            index of the starting state in self.states
         """
         self.current_state = self.starting_states[
             np.random.randint(len(self.starting_states))
@@ -135,7 +158,22 @@ class FJOpinionDynamicsFinite(BaseEnv):
     def step(self, action: int, state: int = None):
         """
         Given the current state (or given state) and an action, performs a step in the environment.
-        Returns the next state, reward, and whether the state is terminal.
+        
+        Parameters
+        ----------
+        action: int
+            The action to take (node index to connect/disconnect or to select for rewiring).
+        state: int, optional
+            The state index to use instead of the current state.
+        
+        Returns
+        -------
+        new_state: int
+            The index of the new state after taking the action.
+        reward: float
+            The reward obtained after taking the action (reduction in polarization).
+        terminal: bool
+            Whether the new state is terminal.
         """
         if state is None:
             state = self.current_state
@@ -176,9 +214,16 @@ class FJOpinionDynamicsFinite(BaseEnv):
             return new_state, polarization_old - polarization_new, terminal
 
     @staticmethod
-    def polarization(G: nx.Graph, sigma: np.ndarray):
+    def polarization(G: nx.Graph, sigma):
         """
-        Returns the polarization of a network.
+        Computes the polarization of a network.
+
+        Parameters
+        ----------
+        G : networkx.Graph
+            Input undirected, unweighted graph.
+        sigma : np.ndarray or list
+            Initial opinion vector (values in [-1, 1]).
         """
         nodelist = sorted(G.nodes())
         L = nx.laplacian_matrix(G, nodelist=nodelist).toarray()

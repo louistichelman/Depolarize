@@ -1,10 +1,42 @@
+"""
+Heuristic Algorithms for FJ-OffDP
+---------------------------------
+
+This module implements two heuristic strategies for the Offline Depolarization Problem (OffDP) 
+under the Friedkin–Johnsen (FJ) model. Both heuristics 
+were introduced by Rácz et al. (2021) and serve as baselines for evaluating depolarization methods.
+
+Implemented heuristics:
+- Disagreement Seeking (DS):
+  Iteratively adds the edge with the largest opinion disagreement (z_i - z_j)^2 between its endpoints.
+
+- Coordinate Descent (CD):
+  Iteratively adds the edge that maximizes an approximation of the polarization reduction,
+  based on a first-order update of the Laplacian.
+"""
+
+
 import numpy as np
 import networkx as nx
 
 
-def heuristic_ds_fj_depolarize(G, sigma, k):
+def heuristic_ds_fj_depolarize(G: nx.Graph, sigma, k: int):
     """
     "Disagreement Seeking" heuristic for Friedkin-Johnson model.
+
+    Parameters
+    ----------
+    G : networkx.Graph
+        Input undirected, unweighted graph.
+    sigma : np.ndarray or list
+        Initial opinion vector (values in [-1, 1]).
+    k : int
+        Number of edge additions allowed (budget).
+
+    Returns
+    -------
+    G_final : networkx.Graph
+        Graph after adding k edges using the DS heuristic.
     """
     G = G.copy()
     n = G.number_of_nodes()
@@ -44,6 +76,20 @@ def heuristic_ds_fj_depolarize(G, sigma, k):
 def heuristic_cd_fj_depolarize(G, sigma, k):
     """
     "Coordinate descent" heuristic for Friedkin-Johnson model.
+
+    Parameters
+    ----------
+    G : networkx.Graph
+        Input undirected, unweighted graph.
+    sigma : np.ndarray or list
+        Initial opinion vector (values in [-1, 1]).
+    k : int
+        Number of edge additions allowed (budget).
+
+    Returns
+    -------
+    G_final : networkx.Graph
+        Graph after adding k edges using the CD heuristic.
     """
     G = G.copy()
     n = G.number_of_nodes()

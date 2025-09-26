@@ -1,18 +1,44 @@
+"""
+Greedy FJ-Depolarize Algorithm
+------------------------------
+
+This module implements the exact greedy heuristic for the unweighted Offline Depolarization Problem (OffDP) 
+under the Friedkin–Johnsen (FJ) model. We assume no weigts.
+
+Algorithm:
+- Iteratively selects up to k edges to add (if absent) or delete (if present),
+  choosing the edge that maximally decreases network polarization at each step.
+- Polarization change is computed exactly using Lemma 3.1 from the Thesis (Rácz et al. (2021)).
+
+Purpose:
+This implementation is used in the thesis to compare greedy performance against 
+heuristics (DS, CD) and optimal solutions on small graphs, and to serve as a baseline 
+for deep reinforcement learning experiments.
+"""
+
 import numpy as np
 import networkx as nx
 
 
-def greedy_fj_depolarize(G, sigma, k):
+def greedy_fj_depolarize(G: nx.Graph, sigma, k: int) -> nx.Graph:
     """
-    Input:
-    G: networkx.Graph (unweighted, undirected)
-    sigma: np.array of internal opinions (shape n,)
-    k: number of steps
+    Greedy FJ-Depolarize algorithm for the unweighted Offline Depolarization Problem (OffDP)
 
-    Output:
-    best_edges: list of chosen edges [(i,j), ...]
-    G_final: networkx.Graph after modifications
+    Parameters
+    ----------
+    G : networkx.Graph
+        Input undirected, unweighted graph.
+    sigma : np.ndarray or list
+        Initial opinion vector (values in [-1, 1]).
+    k : int
+        Number of edge modifications (budget).
+    
+    Returns
+    -------
+    networkx.Graph
+        Modified graph after k greedy interventions.
     """
+
     G = G.copy()
     n = G.number_of_nodes()
     nodes = list(G.nodes())
@@ -44,8 +70,6 @@ def greedy_fj_depolarize(G, sigma, k):
                     z_diff * (2 * delta * z @ x) / denom
                     - (z_diff**2) * (delta**2 * x @ x) / denom**2
                 )
-
-                # print("Checking edge ({}, {}): delta_pol = {}".format(nodes[i], nodes[j], delta_pol))
 
                 if delta_pol > max_delta_pol:
                     max_delta_pol = delta_pol

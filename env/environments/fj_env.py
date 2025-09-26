@@ -1,3 +1,23 @@
+"""
+FJOpinionDynamics Environment
+-----------------------------
+
+This file defines the FJOpinionDynamics environment, an implementation of the
+Friedkin–Johnsen (FJ) opinion dynamics model as a Markov Decision Process (MDP).
+
+Key features:
+- Represents states as dictionaries containing graph structure, opinions,
+  current polarization, and other metadata.
+- Supports both randomly initialized states (Watts–Strogatz graphs + random opinions)
+  and pre-saved start states loaded from disk.
+- Provides reset, step, and terminal condition methods to interact with the environment.
+- Computes polarization based on the FJ model, with optional resistance matrix support.
+
+This environment is used for training and evaluating reinforcement learning
+agents (e.g., DQN with GNNs) in the Offline Depolarization Problem (OffDP).
+"""
+
+
 import numpy as np
 import networkx as nx
 import torch
@@ -23,14 +43,21 @@ class FJOpinionDynamics(BaseEnv):
     - 'influence_matrix': the fundamental matrix of the network (numpy.ndarray)
     - 'graph_data': the graph data in PyTorch Geometric format (torch_geometric.utils.data.Data)
 
-    The actions are node indices.
+    Parameters
+    ----------
+    n : int, optional
+        Number of nodes in the graph. Required if start_states is not provided.
+    start_states : str, optional
+        Path to a file containing pre-saved start states. If provided, n is ignored.
+    average_degree : int, optional
+        Average degree of the generated Watts-Strogatz graph (default: 6).
+    k : int, optional
+        Number of edge modifications allowed (budget). Default is n // 10.
+    keep_resistance_matrix : bool, optional
+        If True, the resistance matrix is kept in the influence_matrix field, used for training Graphormer-GD.
+        Default is False.
+    **kwargs : additional keyword arguments
 
-    Arguments:
-    - n: number of nodes in the graph (int)
-    - start_states: path to a file containing a list of start states (str)
-    - average_degree: average degree of the graph (int, default=6)
-    - k: number of edges that can be changed in one episode (int, default=n//10)
-    - keep_resistance_matrix: whether to keep the resistance matrix instead of the fundamental matrix in the state representation (useful for training Graphormer-GD) (bool, default=False)
     """
 
     def __init__(self, n: int = None, start_states: str = None, **kwargs):
