@@ -1,3 +1,27 @@
+"""
+Greedy Baseline for FJ-OffDP
+--------------------------------
+
+This script computes greedy baseline solutions for the Friedkin–Johnsen
+offline depolarization problem (FJ-OffDP).
+
+Workflow:
+1. Loads start states (generated via `3_make_dataset.py`) from the specified
+   folder (`val`, or `test`).
+2. Applies the greedy edge modification algorithm for each state and
+   each specified intervention budget k.
+3. Saves the resulting graphs and polarization scores to
+   `data/friedkin-johnson/greedy_solutions`.
+
+Usage:
+
+--n_values: List of graph sizes (n) to process (default: [50, 100, 150]) (must match generated states)
+--k_values: List of intervention budgets (k) to process (default: [1, 2, 3, 4, 5])
+--folder: Folder containing the start states (`val` or `test`, default: `test`)
+--average_degree: Average degree of the graphs to consider (default: 6) (must match generated states)
+"""
+
+
 #!/usr/bin/env python3
 import os
 import sys
@@ -17,7 +41,7 @@ def compute_greedy_solutions(
     k_values: list, n_values: list, folder: str, average_degree: int = 6
 ):
     """
-    Compute and save greedy solutions for FJ-Depolarize for given n values and k values
+    Compute and save greedy solutions for FJ-OffDP for given n values and k values
     for validation and test sets.
     The states must be generated first via make_dataset.py.
     """

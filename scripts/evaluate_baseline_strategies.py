@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from evaluation import test_and_save_baselines
-from visualization import visualize_polarization_development_multiple_policies
+from visualization import visualize_polarization_development_dqn_and_baselines
 
 
 def evaluate_baseline_strategies(
@@ -16,7 +16,7 @@ def evaluate_baseline_strategies(
     test_and_save_baselines(
         params_env=params_env, n_values=n_values, n_steps=n_steps, folder=folder
     )
-    visualize_polarization_development_multiple_policies(
+    visualize_polarization_development_dqn_and_baselines(
         params_env=params_env, folder=folder
     )
 

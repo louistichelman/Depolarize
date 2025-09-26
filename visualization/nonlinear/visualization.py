@@ -1,90 +1,244 @@
 import matplotlib.pyplot as plt
-import networkx as nx
 import numpy as np
 import os
 import json
 import seaborn as sns
 import csv
 
-def visualize_graph(G, opinions, title="notitle", highlight_nodes=None, file_path=None):
-
-    cmap = plt.cm.coolwarm  # Colormap for opinions
-    norm = plt.Normalize(vmin=-10, vmax=10)  # Normalize opinions to the range [-10, 10]
-    colors = [cmap(norm(opinion)) for opinion in opinions]
-
-    plt.figure(figsize=(10, 8))
-    pos = nx.spring_layout(G)  # Use a consistent layout for the graph
-    nx.draw(
-        G,
-        pos=pos,
-        node_color=colors,
-        with_labels=False,
-        node_size=100,
-        edge_color="gray",
-    )
-
-    # Highlight specific nodes if provided
-    if highlight_nodes:
-        nx.draw_networkx_nodes(
-            G,
-            pos=pos,
-            nodelist=[node for node in highlight_nodes if node is not None],
-            node_color="yellow",
-            node_size=20,
-            # edgecolors='black',
-            linewidths=2,
-        )
-    plt.title(title)
-    if file_path:
-        plt.savefig(file_path)
-    else:
-        plt.show()
-    plt.close()
-
-
-def visualize_opinions(
-    env, recorded_opinions_one_run, title="Opinion Evolution Over Time", file_path=None
+def analyze_actions(
+    run_name=None, run_folder=None, folder="val"
 ):
-    recorded_opinions_array = np.array(
-        recorded_opinions_one_run
-    )  # shape: (n_times, n_nodes)
-    time_steps = np.arange(0, len(recorded_opinions_array))
+    """
+    Analyze recorded actions from one run or a folder of runs.
+    
+    Handles multiple graph sizes n (dict structure).
+    
+    For each n:
+      - number of adds vs deletes
+      - opinion statistics
+      - degree statistics
+      - plots saved to save_path
+    
+    Returns:
+        dict: metrics per graph size n
+    """
 
-    plt.figure(figsize=(20, 6))
-    for node in range(env.n):
-        plt.plot(time_steps, recorded_opinions_array[:, node], alpha=0.7)
-
-    plt.xlabel("Time")
-    plt.ylabel("Opinion")
-    plt.title(title)
-    plt.grid(True)
-    if file_path:
-        plt.savefig(file_path)
+    if run_name is not None:
+        run_dir = os.path.join("results", "dqn", "nonlinear", "runs", run_name)
+        recorded_actions = load_recorded_files(run_dir, aspect="actions", folder=folder)
+        save_path = os.path.join(run_dir, folder)
+        os.makedirs(save_path, exist_ok=True)
+    elif run_folder is not None:
+        run_folder_dir = os.path.join("results", "dqn", "nonlinear", "runs", run_folder)
+        recorded_actions = {}
+        for i, run_name_in_folder in enumerate(os.listdir(run_folder_dir)):
+            run_dir_in_folder = os.path.join(run_folder_dir, run_name_in_folder)
+            recorded_actions_dqn_i = load_recorded_files(run_dir_in_folder, aspect="actions", folder=folder)
+            for n, arr in recorded_actions_dqn_i.items():
+                if n not in recorded_actions:
+                    recorded_actions[n] = arr
+                else:
+                    # concatenate simulations
+                    recorded_actions[n] = np.concatenate(
+                        [recorded_actions[n], arr], axis=0
+                    )
+        save_path = os.path.join(run_folder_dir, folder)
+        os.makedirs(save_path, exist_ok=True)
     else:
-        plt.show()
+        raise ValueError("Either run_name or run_folder must be provided.")
+
+    all_metrics = {}
+
+    for n, actions_arr in recorded_actions.items():
+
+        # --- Overall (time-independent) metrics for this n ---
+        actions_flattened = actions_arr.reshape(-1, actions_arr.shape[-1])  # shape (num_sims * T, 5)
+
+        sigma_tau = actions_flattened[:, 0]
+        sigma_action = actions_flattened[:, 1]
+        connected = actions_flattened[:, 2].astype(bool)
+        deg_tau = actions_flattened[:, 3]
+        deg_action = actions_flattened[:, 4]
+
+        opinion_diff = np.abs(sigma_tau - sigma_action)
+
+        # masks
+        add_mask = ~connected
+        del_mask = connected
+
+        metrics = {
+            "number_of_recorded_actions": len(actions_flattened),
+            "n_adds": int(np.sum(add_mask)),
+            "n_deletes": int(np.sum(del_mask)),
+            "avg_opinion_tau": float(np.mean(sigma_tau)),
+            "avg_opinion_action": float(np.mean(sigma_action)),
+            "avg_opinion_diff": float(np.mean(opinion_diff)),
+            "avg_opinion_diff_adds": float(np.mean(opinion_diff[add_mask])) if np.any(add_mask) else None,
+            "avg_opinion_diff_deletes": float(np.mean(opinion_diff[del_mask])) if np.any(del_mask) else None,
+            "avg_deg_tau": float(np.mean(deg_tau)),
+            "avg_deg_action": float(np.mean(deg_action)),
+            "avg_deg_tau_adds": float(np.mean(deg_tau[add_mask])) if np.any(add_mask) else None,
+            "avg_deg_tau_deletes": float(np.mean(deg_tau[del_mask])) if np.any(del_mask) else None,
+        }
+        all_metrics[n] = metrics
+
+        # plots
+        n_save_path = os.path.join(save_path, f"n{n}")
+        os.makedirs(n_save_path, exist_ok=True)
+
+        # 1. Adds vs Deletes
+        plt.figure()
+        plt.bar(["Adds", "Deletes"], [metrics["n_adds"], metrics["n_deletes"]])
+        plt.title(f"Adds vs Deletes (n={n})")
+        plt.savefig(os.path.join(n_save_path, "adds_vs_deletes.png"))
+        plt.close()
+
+        # 2. Opinion differences (boxplot)
+        if np.any(add_mask) and np.any(del_mask):
+            plt.figure()
+            data = [opinion_diff[add_mask], opinion_diff[del_mask]]
+            plt.boxplot(data, labels=["Adds", "Deletes"])
+            plt.ylabel("Opinion difference |σ_tau - σ_action|")
+            plt.title(f"Opinion Differences (n={n})")
+            plt.savefig(os.path.join(n_save_path, "opinion_diff_boxplot.png"))
+            plt.close()
+
+        # 3. Degree histograms
+        plt.figure()
+        plt.hist(deg_tau, bins=20, alpha=0.5, label="deg_tau")
+        plt.hist(deg_action, bins=20, alpha=0.5, label="deg_action")
+        plt.legend()
+        plt.title(f"Degree Distributions (n={n})")
+        plt.savefig(os.path.join(n_save_path, "degree_histograms.png"))
+        plt.close()
+
+
+        # --- Temporal strategy plot ---
+        plot_temporal_strategy(actions_arr, n, n_save_path)
+
+    # --- Save all metrics as JSON ---
+    metrics_path = os.path.join(save_path, "metrics.json")
+    with open(metrics_path, "w") as f:
+        json.dump(all_metrics, f, indent=4)
+
+
+def plot_temporal_strategy(actions, n, save_path, n_buckets=8):
+    """
+    Plot temporal strategy with mean and std: adds vs deletes counts and avg opinion difference.
+    
+    actions: np.array of shape (num_sims, T, 5)
+             (sigma_tau, sigma_action, connected, deg_tau, deg_action)
+    """
+    # sns.set_style("whitegrid")
+
+    # Ensure actions has shape (num_sims, T, 5)
+    if actions.ndim == 2:
+        actions = actions[None, :, :]  # single run -> batch of 1
+    
+    num_sims, n_steps, _ = actions.shape
+    bucket_size = n_steps // n_buckets
+    
+    add_counts, del_counts = [], []
+    add_diffs, del_diffs = [], []
+    add_counts_std, del_counts_std = [], []
+    add_diffs_std, del_diffs_std = [], []
+    
+    for b in range(n_buckets):
+        start = b * bucket_size
+        end = (b + 1) * bucket_size if b < n_buckets - 1 else n_steps
+        
+        # Collect metrics per simulation
+        adds_per_sim = []
+        dels_per_sim = []
+        add_diff_per_sim = []
+        del_diff_per_sim = []
+        
+        for sim in range(num_sims):
+            sigma_tau = actions[sim, start:end, 0]
+            sigma_action = actions[sim, start:end, 1]
+            connected = actions[sim, start:end, 2].astype(bool)
+            opinion_diff = np.abs(sigma_tau - sigma_action)
+            
+            adds = ~connected
+            dels = connected
+            
+            adds_per_sim.append(np.sum(adds))
+            dels_per_sim.append(np.sum(dels))
+            add_diff_per_sim.append(np.mean(opinion_diff[adds]) if np.any(adds) else np.nan)
+            del_diff_per_sim.append(np.mean(opinion_diff[dels]) if np.any(dels) else np.nan)
+        
+        add_counts.append(np.mean(adds_per_sim))
+        del_counts.append(np.mean(dels_per_sim))
+        add_counts_std.append(np.std(adds_per_sim))
+        del_counts_std.append(np.std(dels_per_sim))
+        add_diffs.append(np.nanmean(add_diff_per_sim))
+        del_diffs.append(np.nanmean(del_diff_per_sim))
+        add_diffs_std.append(np.nanstd(add_diff_per_sim))
+        del_diffs_std.append(np.nanstd(del_diff_per_sim))
+    
+    # --- Plot ---
+    fig, ax1 = plt.subplots(figsize=(8, 4))
+    x = np.arange(n_buckets)
+
+    # Create bucket labels like "0–2k", "2k–4k", ...
+    bucket_labels = []
+    for b in range(n_buckets):
+        start = b * bucket_size
+        end = (b + 1) * bucket_size if b < n_buckets - 1 else n_steps
+        # Format in thousands
+        bucket_labels.append(f"{start//1000}k–{end//1000}k")
+
+    # Use prettier colors:)
+    palette = sns.color_palette("deep")
+
+    orange = palette[1] # deep orange
+    purple = palette[4]  # deep purple
+
+    
+    # Bars with std
+    width = 0.35
+    ax1.bar(x - width/2, add_counts, width, yerr=add_counts_std, 
+            label="Adds", alpha=0.7, color=orange, capsize=3)
+    ax1.bar(x + width/2, del_counts, width, yerr=del_counts_std, 
+            label="Deletes", alpha=0.7, color=purple, capsize=3)
+    ax1.set_xlabel("Time bucket")
+    ax1.set_ylabel("Number of actions")
+    ax1.set_ylim(0, 1400)
+    ax1.set_yticks(np.arange(0, 1300, 200))
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(bucket_labels) 
+    ax1.legend(loc="upper left")
+    
+    # Second y-axis for opinion differences
+    ax2 = ax1.twinx()
+    ax2.plot(x, add_diffs, "-o", label="Avg diff (Adds)", color=orange)
+    ax2.fill_between(x, np.array(add_diffs) - np.array(add_diffs_std),
+                        np.array(add_diffs) + np.array(add_diffs_std),
+                        color=orange, alpha=0.2)
+    ax2.plot(x, del_diffs, "-o", label="Avg diff (Deletes)", color=purple)
+    ax2.fill_between(x, np.array(del_diffs) - np.array(del_diffs_std),
+                        np.array(del_diffs) + np.array(del_diffs_std),
+                        color=purple, alpha=0.2)
+    ax2.set_ylabel("Average opinion difference")
+    ax2.set_ylim(0, 15)
+    ax2.legend(loc="upper right")
+    
+    plt.title(f"Temporal Strategy (n={n})")
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_path, f"temporal_strategy_n{n}.png"))
     plt.close()
 
 
-def visualize_polarization_development_multiple_policies(
+def visualize_polarization_development_dqn_and_baselines(
     run_name=None, run_folder=None, params_env=None, title="Polarization Over Time", folder="val"
 ):
     dict_policies_to_visualize = {}
-
-    def load_recorded_opinions(file_path):
-        evaluation_dir = os.path.join(file_path, folder)
-        recorded_opinions_dqn = {}
-        if os.path.exists(evaluation_dir):
-            for fname in os.listdir(evaluation_dir):
-                if fname.startswith("recorded_opinions_") and fname.endswith(".npy"):
-                    n = int(fname[len("recorded_opinions_dqn_n") : -len(".npy")])
-                    recorded_opinions_dqn[n] = np.load(os.path.join(evaluation_dir, fname))
-        return recorded_opinions_dqn
 
     if run_name is not None:
         run_dir = os.path.join("results", "dqn", "nonlinear", "runs", run_name)
         with open(os.path.join(run_dir, "params_env.json"), "r") as f:
             params_env = json.load(f)
-        recorded_opinions_dqn = load_recorded_opinions(run_dir)
+        recorded_opinions_dqn = load_recorded_files(run_dir, aspect="opinions", folder=folder)
         for n in recorded_opinions_dqn:
             dict_policies_to_visualize[n] = [("DQN", recorded_opinions_dqn[n])]
 
@@ -95,10 +249,10 @@ def visualize_polarization_development_multiple_policies(
                 run_dir_in_folder = os.path.join(run_folder_dir, run_name_in_folder)
                 with open(os.path.join(run_dir_in_folder, "params_env.json"), "r") as f:
                     params_env = json.load(f)
-                recorded_opinions_dqn = load_recorded_opinions(run_dir_in_folder)
+                recorded_opinions_dqn = load_recorded_files(run_dir_in_folder, aspect="opinions", folder=folder)
                 continue
             run_dir_in_folder = os.path.join(run_folder_dir, run_name_in_folder)
-            recorded_opinions_dqn_i = load_recorded_opinions(run_dir_in_folder)
+            recorded_opinions_dqn_i = load_recorded_files(run_dir_in_folder, aspect="opinions", folder=folder)
             for n in recorded_opinions_dqn:
                 recorded_opinions_dqn[n] = np.concatenate(
                     (recorded_opinions_dqn[n], recorded_opinions_dqn_i[n]), axis=0
@@ -322,6 +476,17 @@ def visualize_polarization_development_various_policies(
             writer.writerow(row)
 
 
+def load_recorded_files(file_path, aspect="opinions", folder="val"):
+        evaluation_dir = os.path.join(file_path, folder)
+        recorded_aspect = {}
+        if os.path.exists(evaluation_dir):
+            for fname in os.listdir(evaluation_dir):
+                if fname.startswith(f"recorded_{aspect}_") and fname.endswith(".npy"):
+                    n = int(fname[len(f"recorded_{aspect}_dqn_n") : -len(".npy")])
+                    recorded_aspect[n] = np.load(os.path.join(evaluation_dir, fname))
+        return recorded_aspect
+
+
 def plot_opinions_with_polarization(recorded_opinions_array, run_to_visualize=0, file_path=None):
     single_run = recorded_opinions_array[run_to_visualize]
     fig, ax1 = plt.subplots(figsize=(5.5, 4))
@@ -354,6 +519,7 @@ def average_pol(opinions_array):
         mean_pol = np.mean(pol_per_step, axis=0)
         std_pol = np.std(pol_per_step, axis=0)
         return mean_pol, std_pol
+
 
 def average_pol_no_std(opinions_array):
     # Calculate polarization for each time step across all simulations

@@ -1,3 +1,40 @@
+"""
+Evaluation for Policy in Nonlinear Opinion Dynamics (NL-OnDP)
+-----------------------------------------------------------
+
+This module provides tools to evaluate learned DQN policies and simple
+heuristic baselines in the nonlinear opinion dynamics environment
+(NLOpinionDynamics). It records opinion trajectories, actions, and
+graph metrics, and saves them for later analysis.
+
+Functions:
+- test_and_save_policy_dqn(run_name, n_values, n_steps=20000, folder="val"):
+    Evaluate a trained DQN policy on validation/test states and save results.
+
+- test_and_save_baselines(params_env, n_values, n_steps=20000, folder="test", force_recomputation=False):
+    Evaluate baseline strategies (no policy, min-max, deleting, soft min-max)
+    on validation/test states and save results.
+
+- test_policy(env, policy=lambda state, env: 0, n_steps=20000, states=None, n_simpulations=15):
+    Core simulation loop. Runs opinion dynamics with a given policy, recording
+    opinions, actions, and graph metrics across steps.
+
+- minmax_policy(state):
+    Baseline that connects extreme opinions (max with min).
+
+- deleting_policy(state):
+    Baseline that tends to remove edges between nodes with similar opinions.
+
+- soft_minmax_policy(state):
+    Softer variant of min-max: uses percentile thresholds to select nodes.
+
+Outputs:
+- Numpy arrays of recorded opinions, actions, and graph metrics.
+- Saved to disk under results/dqn/nonlinear/... (for DQN) or
+  data/nonlinear/baselines/... (for baselines).
+"""
+
+
 from tqdm import tqdm
 import numpy as np
 import random
@@ -6,6 +43,7 @@ import json
 import torch
 from env import NLOpinionDynamics
 from agents.dqn import DQN
+import networkx as nx
 
 
 def test_and_save_policy_dqn(run_name, n_values, n_steps=20000, folder="val"):
@@ -49,7 +87,7 @@ def test_and_save_policy_dqn(run_name, n_values, n_steps=20000, folder="val"):
         )
         with open(states_path, "rb") as f:
             states = torch.load(f, weights_only=False)
-        recorded_opinions = test_policy(
+        recorded_opinions, recorded_actions, recorded_graph_metrics = test_policy(
             env, policy=agent.policy_greedy, n_steps=n_steps, states=states
         )
 
@@ -62,6 +100,20 @@ def test_and_save_policy_dqn(run_name, n_values, n_steps=20000, folder="val"):
                 f"recorded_opinions_dqn_n{n}.npy",
             ),
             recorded_opinions,
+        )
+        np.save(
+            os.path.join(
+                save_path,
+                f"recorded_actions_dqn_n{n}.npy",
+            ),
+            recorded_actions,
+        )
+        np.save(
+            os.path.join(
+                save_path,
+                f"recorded_graph_metrics_dqn_n{n}.npy",
+            ),
+            recorded_graph_metrics,
         )
 
 
@@ -99,60 +151,44 @@ def test_and_save_baselines(
             states = torch.load(f, weights_only=False)
 
         # Test without policy
-        save_path = os.path.join(baselines_dir, f"recorded_opinions_no_policy.npy")
-        if os.path.exists(save_path) and not force_recomputation:
-            print(
-                f"Results already exist at {save_path}, skipping test without policy."
-            )
-        else:
-            recorded_opinions_no_policy = test_policy(
-                env, n_steps=n_steps, states=states
-            )
-            np.save(save_path, recorded_opinions_no_policy)
-            print(f"Results saved to {save_path}")
+        recorded_opinions_no_policy, recorded_actions_no_policy, recorded_graph_metrics_no_policy = test_policy(
+            env, n_steps=n_steps, states=states
+        )
+        np.save(os.path.join(baselines_dir, f"recorded_opinions_no_policy.npy"), recorded_opinions_no_policy)
+        np.save(os.path.join(baselines_dir, f"recorded_actions_no_policy.npy"), recorded_actions_no_policy)
+        np.save(os.path.join(baselines_dir, f"recorded_graph_metrics_no_policy.npy"), recorded_graph_metrics_no_policy)
+        print(f"Results saved to {baselines_dir}")
 
         # Test the minmax policy
-        save_path = os.path.join(baselines_dir, f"recorded_opinions_minmax.npy")
-        if os.path.exists(save_path) and not force_recomputation:
-            print(
-                f"Results already exist at {save_path}, skipping test with minmax policy."
-            )
-        else:
-            recorded_opinions_min_max = test_policy(
-                env, policy=minmax_policy, n_steps=n_steps, states=states
-            )
-            np.save(save_path, recorded_opinions_min_max)
-            print(f"Results saved to {save_path}")
+        recorded_opinions_min_max, recorded_actions_min_max, recorded_graph_metrics_min_max = test_policy(
+            env, policy=minmax_policy, n_steps=n_steps, states=states
+        )
+        np.save(os.path.join(baselines_dir, f"recorded_opinions_minmax.npy"), recorded_opinions_min_max)
+        np.save(os.path.join(baselines_dir, f"recorded_actions_minmax.npy"), recorded_actions_min_max)
+        np.save(os.path.join(baselines_dir, f"recorded_graph_metrics_minmax.npy"), recorded_graph_metrics_min_max)
+        print(f"Results saved to {baselines_dir}")
 
         # Test the deleting policy
-        save_path = os.path.join(baselines_dir, f"recorded_opinions_deleting.npy")
-        if os.path.exists(save_path) and not force_recomputation:
-            print(
-                f"Results already exist at {save_path}, skipping test with deleting policy."
-            )
-        else:
-            recorded_opinions_deleting = test_policy(
-                env, policy=deleting_policy, n_steps=n_steps, states=states
-            )
-            np.save(save_path, recorded_opinions_deleting)
-            print(f"Results saved to {save_path}")
+        recorded_opinions_deleting, recorded_actions_deleting, recorded_graph_metrics_deleting = test_policy(
+            env, policy=deleting_policy, n_steps=n_steps, states=states
+        )
+        np.save(os.path.join(baselines_dir, f"recorded_opinions_deleting.npy"), recorded_opinions_deleting)
+        np.save(os.path.join(baselines_dir, f"recorded_actions_deleting.npy"), recorded_actions_deleting)
+        np.save(os.path.join(baselines_dir, f"recorded_graph_metrics_deleting.npy"), recorded_graph_metrics_deleting)
+        print(f"Results saved to {baselines_dir}")
 
         # Test the soft minmax policy
-        save_path = os.path.join(baselines_dir, f"recorded_opinions_soft_minmax.npy")
-        if os.path.exists(save_path) and not force_recomputation:
-            print(
-                f"Results already exist at {save_path}, skipping test with soft minmax policy."
-            )
-        else:
-            recorded_opinions_greedy = test_policy(
-                env, policy=soft_minmax_policy, n_steps=n_steps, states=states
-            )
-            np.save(save_path, recorded_opinions_greedy)
-            print(f"Results saved to {save_path}")
+        recorded_opinions_greedy, recorded_actions_greedy, recorded_graph_metrics_greedy = test_policy(
+            env, policy=soft_minmax_policy, n_steps=n_steps, states=states
+        )
+        np.save(os.path.join(baselines_dir, f"recorded_opinions_soft_minmax.npy"), recorded_opinions_greedy)
+        np.save(os.path.join(baselines_dir, f"recorded_actions_soft_minmax.npy"), recorded_actions_greedy)
+        np.save(os.path.join(baselines_dir, f"recorded_graph_metrics_soft_minmax.npy"), recorded_graph_metrics_greedy)
+        print(f"Results saved to {baselines_dir}")
 
 
 def test_policy(
-    env, policy=lambda state, env: 0, n_steps=20000, states=None, n_simpulations=15
+    env, policy=lambda state: 0, n_steps=20000, states=None, n_simpulations=15
 ):
     """Test a policy by simulating opinion dynamics and recording the opinions.
     Args:
@@ -164,74 +200,68 @@ def test_policy(
         np.ndarray: Recorded opinions from the simulations.
     """
     recorded_opinions = []
+    recorded_actions = []
+    recorded_graph_metrics = []
 
     if states is None:
         # Generate random initial states if not provided
         states = [env.reset() for _ in range(n_simpulations)]
 
     for state in tqdm(states, desc=f"Simulating {len(states)} runs with policy"):
+        recorded_actions_simulation = []
         recorded_opinions_simulation = [state["sigma"].copy()]
-        for time_step in range(1, n_steps + 1):
-            action = policy(state=state, env=env)
-            next_state, _, _ = env.step(action=action, state=state)
-            if time_step % 2 == 0:
+        recorded_graph_metrics_simulation = []
+        for _ in range(1, n_steps + 1):
+            action = policy(state=state)
+            if state["tau"] is not None:
+                # opinions
                 recorded_opinions_simulation.append(next_state["sigma"].copy())
+
+                # actions
+                connected = state["graph"].has_edge(state["tau"], action)
+                deg_tau = state["graph"].degree[state["tau"]]
+                deg_action = state["graph"].degree[action]
+
+                recorded_actions_simulation.append((
+                    state["sigma"][state["tau"]],
+                    state["sigma"][action],
+                    connected,
+                    deg_tau,
+                    deg_action
+                ))
+
+                # graph metrics
+                deg_dict = dict(state["graph"].degree())
+                deg_vec = np.array([deg_dict[node] for node in state["graph"].nodes()])
+                avg_clustering = nx.average_clustering(state["graph"])
+                recorded_graph_metrics_simulation.append((
+                    np.mean(deg_vec),
+                    np.std(deg_vec),
+                    avg_clustering
+                ))
+
+            next_state, _, _ = env.step(action=action, state=state)                
             state = next_state
         recorded_opinions.append(np.array(recorded_opinions_simulation))
+        recorded_actions.append(np.array(recorded_actions_simulation))
+        recorded_graph_metrics.append(np.array(recorded_graph_metrics_simulation))
 
-    return np.array(recorded_opinions)  # Shape: (n_simpulations, n_steps, n_nodes)
+    return np.array(recorded_opinions), np.array(recorded_actions), np.array(recorded_graph_metrics)  # Shape: (n_simpulations, n_steps, n_nodes), (n_simpulations, n_steps, 3)
 
 
 # ----baselines: simple strategies----
-def random_policy(state, env):
-    return random.randint(0, len(state["sigma"]) - 1)
 
 
-def minmax_policy(state, env):
+def minmax_policy(state):
     if state["tau"] is None:
         return np.argmax(state["sigma"])
     else:
         sigma_values = np.array(state["sigma"])
-        return np.argmin(
-            sigma_values[
-                np.setdiff1d(
-                    np.arange(len(sigma_values)), state["graph"].neighbors(state["tau"])
-                )
-            ]
-        )
+        candidates = np.setdiff1d(np.arange(len(sigma_values)), state["graph"].neighbors(state["tau"]))
+        return candidates[np.argmin(sigma_values[candidates])]
 
 
-# def minmax_policy_soft(state, env):
-#     def activation(source, target, opinion_range):
-#         return np.tanh(0.2 * (1 - abs(source - target) / (opinion_range)) * source)
-
-#     if state["tau"] is None:
-#         # sigma_values = np.array(state["sigma"])
-#         return random.randint(0, len(state["sigma"]) - 1)
-#         # if random.random() < 0.5:
-#         #     threshold_top = np.percentile(sigma_values, 75)
-#         #     candidates = np.where(sigma_values >= threshold_top)[0]
-#         #     return random.choice(candidates)
-#         # else:
-#         #     threshold_bottom = np.percentile(sigma_values, 25)
-#         #     candidates = np.where(sigma_values <= threshold_bottom)[0]
-#         #     return random.choice(candidates)
-#     else:
-#         sigma_values = np.array(state["sigma"])
-#         target = state["tau"]
-#         target_opinion = sigma_values[target]
-#         opinion_range = np.max(sigma_values) - np.min(sigma_values)
-#         non_neighbors = np.setdiff1d(
-#             np.arange(len(sigma_values)), list(state["graph"].neighbors(target))
-#         )
-#         return min(
-#             non_neighbors,
-#             key=lambda node: np.sign(target_opinion)
-#             * activation(sigma_values[node], target_opinion, opinion_range),
-#         )
-
-
-def deleting_policy(state, env):
+def deleting_policy(state):
     if state["tau"] is None:
         if random.random() < 0.5:
             return np.argmax(state["sigma"])
@@ -248,43 +278,7 @@ def deleting_policy(state, env):
         )
 
 
-# def greedy_policy(state, env):
-#     if state["tau"] is None:
-#         sigma_values = np.array(state["sigma"])
-#         if random.random() < 0.5:
-#             threshold_top = np.percentile(sigma_values, 75)
-#             candidates = np.where(sigma_values >= threshold_top)[0]
-#             return random.choice(candidates)
-#         else:
-#             threshold_bottom = np.percentile(sigma_values, 25)
-#             candidates = np.where(sigma_values <= threshold_bottom)[0]
-#             return random.choice(candidates)
-#     else:
-#         tau = state["tau"]
-#         best_node = None
-#         best_value = float("inf")
-#         for i in range(len(state["sigma"])):
-#             G_new = state["graph"].copy()
-#             if G_new.has_edge(tau, i):
-#                 G_new.remove_edge(tau, i)
-#             else:
-#                 G_new.add_edge(tau, i)
-#             sigma_new = env.opinion_updates(G_new, state["sigma"])
-#             if env.polarization(G_new, sigma_new) < best_value:
-#                 best_value = env.polarization(G_new, sigma_new)
-#                 best_node = i
-#         return best_node
-
-
-# def minmax_policy(state):
-#     if state["tau"] is None:
-#         return np.argmax(state["sigma"])
-#     else:
-#         sigma_values = np.array(state["sigma"])
-#         return np.argmin(sigma_values[np.setdiff1d(np.arange(len(sigma_values)), state["graph"].neighbors(state["tau"]))])
-
-
-def soft_minmax_policy(state, env):
+def soft_minmax_policy(state):
     if state["tau"] is None:
         sigma_values = np.array(state["sigma"])
         threshold_top = np.percentile(sigma_values, 80)
@@ -297,17 +291,3 @@ def soft_minmax_policy(state, env):
             state["graph"].neighbors(state["tau"])
         )
         return min(candidates, key=lambda node: state["sigma"][node])
-
-
-# def deleting_policy(state):
-#     if state["tau"] is None:
-#         if random.random() < 0.5:
-#             return np.argmax(state["sigma"])
-#         else:
-#             return np.argmin(state["sigma"])
-#     else:
-#         sigma_values = np.array(state["sigma"])
-#         neighbors = list(state["graph"].neighbors(state["tau"]))
-#         if not neighbors:
-#             return 0  # No neighbors available
-#         return min(neighbors, key=lambda node: abs(sigma_values[node] - sigma_values[state["tau"]]))
