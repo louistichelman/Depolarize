@@ -1,4 +1,39 @@
 #!/usr/bin/env python3
+"""
+Train and evaluate a DQN agent for FJ-Depolarize or NL-DepolarizeOnline.
+
+This script can be used in three ways:
+1. **Initial training**: Start a new training run with given parameters
+   (environment, agent architecture, hyperparameters). Results, model
+   weights, and parameters are stored in a dedicated run folder.
+2. **Continue training**: Resume training from a previously saved run by
+   reloading model weights and continuing for more timesteps.
+3. **Rerun training**: Repeat training of an existing run multiple times
+   (with identical parameters but fresh random seeds) to evaluate
+   stability and variance.
+
+After training, the script automatically evaluates the learned policies
+on validation or test sets, computes baseline comparisons, and generates
+visualizations of performance and action strategies.
+
+Typical workflow:
+- Train a new agent with specified parameters.
+- Optionally continue training if more timesteps are desired.
+- Optionally rerun training to compare multiple independent runs.
+- Evaluate and visualize results for both FJ and nonlinear settings.
+
+Usage
+-----
+Initial training:
+    python train_dqn.py --environment nonlinear --n 150 --timesteps_train 300000
+
+Continue training:
+    (uncomment and call `continue_training(run_name, timesteps_train)` inside main)
+
+Rerun training:
+    python train_dqn.py --run_name <existing_run_name> --number_of_reruns 3
+"""
+
 import argparse
 import os
 import torch
@@ -22,8 +57,7 @@ from visualization import (
     visualize_dqn_vs_greedy,
     performance_overview,
     visualize_polarization_development_dqn_and_baselines,
-    analyze_actions,
-    visualize_graph_metrics
+    analyze_actions
 )
 
 
@@ -197,7 +231,6 @@ def evaluate_run_nonlinear(run_name, n_values, n_steps=20000, folder="val"):
         run_name=run_name, folder=folder
     )
     analyze_actions(run_name=run_name, folder=folder)
-    visualize_graph_metrics(run_name=run_name, folder=folder)
 
 
 def main():
@@ -252,6 +285,12 @@ def main():
         "--keep_influence_matrix",
         action="store_true",
         help="Whether to keep the influence matrix (needed for Graphormer) (in fj environment is automatically true).",
+    )
+
+    parser.add_argument(
+        "--use_diverse_start_states",
+        action="store_true",
+        help="Whether to use diverse start states for training.",
     )
 
     # Agent parameters
@@ -394,6 +433,10 @@ def main():
                 folder=args.folder,
             )
         return
+    
+    diverse_start_states_string = ""
+    if args.use_diverse_start_states:
+        diverse_start_states_string = "_diverse"
 
     params_env = {
         "environment": args.environment,
@@ -401,7 +444,7 @@ def main():
             "data",
             args.environment,
             "train",
-            f"start_states_train_n{args.n}_d{args.average_degree}.pt",
+            f"start_states{diverse_start_states_string}_train_n{args.n}_d{args.average_degree}.pt",
         ),
         "n": args.n,
         "average_degree": args.average_degree,

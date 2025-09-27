@@ -151,38 +151,34 @@ def test_and_save_baselines(
             states = torch.load(f, weights_only=False)
 
         # Test without policy
-        recorded_opinions_no_policy, recorded_actions_no_policy, recorded_graph_metrics_no_policy = test_policy(
+        recorded_opinions_no_policy, _, recorded_graph_metrics_no_policy = test_policy(
             env, n_steps=n_steps, states=states
         )
         np.save(os.path.join(baselines_dir, f"recorded_opinions_no_policy.npy"), recorded_opinions_no_policy)
-        np.save(os.path.join(baselines_dir, f"recorded_actions_no_policy.npy"), recorded_actions_no_policy)
         np.save(os.path.join(baselines_dir, f"recorded_graph_metrics_no_policy.npy"), recorded_graph_metrics_no_policy)
         print(f"Results saved to {baselines_dir}")
 
         # Test the minmax policy
-        recorded_opinions_min_max, recorded_actions_min_max, recorded_graph_metrics_min_max = test_policy(
+        recorded_opinions_min_max, _, recorded_graph_metrics_min_max = test_policy(
             env, policy=minmax_policy, n_steps=n_steps, states=states
         )
         np.save(os.path.join(baselines_dir, f"recorded_opinions_minmax.npy"), recorded_opinions_min_max)
-        np.save(os.path.join(baselines_dir, f"recorded_actions_minmax.npy"), recorded_actions_min_max)
         np.save(os.path.join(baselines_dir, f"recorded_graph_metrics_minmax.npy"), recorded_graph_metrics_min_max)
         print(f"Results saved to {baselines_dir}")
 
         # Test the deleting policy
-        recorded_opinions_deleting, recorded_actions_deleting, recorded_graph_metrics_deleting = test_policy(
+        recorded_opinions_deleting, _, recorded_graph_metrics_deleting = test_policy(
             env, policy=deleting_policy, n_steps=n_steps, states=states
         )
         np.save(os.path.join(baselines_dir, f"recorded_opinions_deleting.npy"), recorded_opinions_deleting)
-        np.save(os.path.join(baselines_dir, f"recorded_actions_deleting.npy"), recorded_actions_deleting)
         np.save(os.path.join(baselines_dir, f"recorded_graph_metrics_deleting.npy"), recorded_graph_metrics_deleting)
         print(f"Results saved to {baselines_dir}")
 
         # Test the soft minmax policy
-        recorded_opinions_greedy, recorded_actions_greedy, recorded_graph_metrics_greedy = test_policy(
+        recorded_opinions_greedy, _, recorded_graph_metrics_greedy = test_policy(
             env, policy=soft_minmax_policy, n_steps=n_steps, states=states
         )
         np.save(os.path.join(baselines_dir, f"recorded_opinions_soft_minmax.npy"), recorded_opinions_greedy)
-        np.save(os.path.join(baselines_dir, f"recorded_actions_soft_minmax.npy"), recorded_actions_greedy)
         np.save(os.path.join(baselines_dir, f"recorded_graph_metrics_soft_minmax.npy"), recorded_graph_metrics_greedy)
         print(f"Results saved to {baselines_dir}")
 

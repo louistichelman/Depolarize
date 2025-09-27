@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Dataset Generation for DQN Experiments
 --------------------------------------
@@ -9,7 +10,7 @@ depolarization experiments under either:
 
 Functionality:
 - Uses the environment registry (ENVIRONMENT_REGISTRY) to instantiate the chosen env.
-- Randomly generates unique start states (graph + opinion vector + other env info).
+- Randomly generates unique start states (graph + opinion vector).
 - Ensures no duplicate states (via state_hash).
 - Saves datasets as PyTorch `.pt` files in `data/{env}/train`, `val`, and `test`.
 - Optionally generates out-of-distribution (OOD) datasets for different graph sizes.
@@ -36,9 +37,6 @@ Notes:
 - Files are stored in PyTorch tensor format (`.pt`).
 - Generated datasets are used as start states for DQN training and evaluation.
 """
-
-
-#!/usr/bin/env python3
 import argparse
 import os
 import torch

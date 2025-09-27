@@ -1,3 +1,47 @@
+"""
+Visualization of DQN and Baseline Results (Nonlinear Opinion Dynamics)
+---------------------------------------------------------------------
+
+This module provides tools to analyze and visualize results from DQN
+and baseline evaluations in the NL-OnDP setting.
+
+Functions:
+- analyze_actions(run_name=None, run_folder=None, folder="val"):
+    Load recorded actions from a run or run folder, compute metrics
+    (adds vs deletes, opinion/degree statistics), and generate plots.
+
+- plot_temporal_strategy(actions, n, save_path, n_buckets=8):
+    Visualize temporal patterns of adds vs deletes and average opinion
+    differences in time buckets.
+
+- visualize_polarization_development_dqn_and_baselines(
+    run_name=None, run_folder=None, params_env=None, title="...", folder="val"
+  ):
+    Compare polarization development over time for DQN and baseline
+    strategies, saving plots and summary metrics.
+
+- visualize_polarization_development_various_policies(
+    dict_policies_to_visualize, ...
+  ):
+    Core plotting function to compare polarization curves of multiple
+    policies across graph sizes n.
+
+- load_recorded_files(file_path, aspect="opinions", folder="val"):
+    Utility to load recorded .npy results (opinions/actions/metrics)
+    from a given run directory.
+
+- plot_opinions_with_polarization(recorded_opinions_array, run_to_visualize=0, file_path=None):
+    Plot raw node opinion trajectories for a single simulation run,
+    with polarization overlaid on a secondary axis.
+
+- average_pol(opinions_array):
+    Compute mean and standard deviation of polarization over time.
+
+- average_pol_no_std(opinions_array):
+    Compute mean polarization trajectory over time without variance.
+"""
+
+
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -230,7 +274,7 @@ def plot_temporal_strategy(actions, n, save_path, n_buckets=8):
 
 
 def visualize_polarization_development_dqn_and_baselines(
-    run_name=None, run_folder=None, params_env=None, title="Polarization Over Time", folder="val"
+    run_name=None, run_folder=None, params_env=None, title="Polarization Over Time", folder="val", single_plot_n=150
 ):
     dict_policies_to_visualize = {}
 
@@ -368,13 +412,14 @@ def visualize_polarization_development_dqn_and_baselines(
         dict_policies_to_visualize,
         plot_file_path=save_path_figure,
         metrics_file_path=save_path_metrics,
+        single_plot_n=single_plot_n,
         title=title,
     )
 
 
 def visualize_polarization_development_various_policies(
     dict_policies_to_visualize,
-    n=150,
+    single_plot_n=150,
     plot_file_path="polarization_over_time.png",
     metrics_file_path="polarization_metrics.csv",
     title="Polarization Over Time",
@@ -382,9 +427,8 @@ def visualize_polarization_development_various_policies(
 ):
     sns.set_theme(style="whitegrid")
 
-    # Define color palette but skip red
     base_palette = sns.color_palette("tab10")
-    custom_palette = [base_palette[3]] + [c for i, c in enumerate(base_palette) if i not in [1, 2, 3]]  # reserve red for DQN
+    # custom_palette = [base_palette[3]] + [c for i, c in enumerate(base_palette) if i not in [1, 2, 3]]  # reserve red for DQN
 
     num_plots = len(dict_policies_to_visualize)
     fig, axes = plt.subplots(1, num_plots, figsize=(4 * num_plots, 4), sharey=True)
@@ -396,7 +440,7 @@ def visualize_polarization_development_various_policies(
     results = []
 
     for ax, (key, list_policies) in zip(axes, sorted(dict_policies_to_visualize.items())):
-        for color, (strat, opinions_array) in zip(custom_palette, list_policies):
+        for color, (strat, opinions_array) in zip(base_palette, list_policies):
             mean_pol, std_pol = average_pol(opinions_array)
             steps = np.arange(opinions_array.shape[1])
 
@@ -428,6 +472,7 @@ def visualize_polarization_development_various_policies(
         ax.set_title(f"{title} (n={key})")
         ax.set_xticks([0, 5000, 10000])
         ax.set_yticks([20, 50, 100, 150, 175]) 
+        ax.legend(fontsize=9)
         ax.grid(True)
 
     axes[0].set_ylabel("Polarization")
@@ -436,9 +481,9 @@ def visualize_polarization_development_various_policies(
     plt.close(fig)
 
     # Save separate plot for the requested n
-    if n in dict_policies_to_visualize:
+    if single_plot_n in dict_policies_to_visualize:
         fig_single, ax_single = plt.subplots(figsize=(4.8, 3.2))
-        for color, (strat, opinions_array) in zip(custom_palette, dict_policies_to_visualize[n]):
+        for color, (strat, opinions_array) in zip(base_palette, dict_policies_to_visualize[single_plot_n]):
             mean_pol, std_pol = average_pol(opinions_array)
             steps = np.arange(opinions_array.shape[1])
             ax_single.plot(steps, mean_pol, label=strat, alpha=0.8, color=color)
@@ -447,25 +492,20 @@ def visualize_polarization_development_various_policies(
         ax_single.set_xlabel("Time Steps")
         ax_single.set_ylabel("Polarization")
 
-        # # Move y-axis to the right
-        # ax_single.yaxis.tick_right()
-        # ax_single.yaxis.set_label_position("right")
-
         # ax_single.set_xticks([0, 5000, 10000])
         ax_single.set_ylim(20, 125)
-        # ax_single.set_yticks([50, 100]) 
         ax_single.grid(True)
-        # ax_single.legend(fontsize=9)
+        ax_single.legend(fontsize=9)
 
-        single_file_path = plot_file_path.replace(".png", f"_n{n}.png")
+        single_file_path = plot_file_path.replace(".png", f"_n{single_plot_n}.png")
         plt.tight_layout()
         plt.savefig(single_file_path)
         plt.close(fig_single)
 
-        if dict_policies_to_visualize[n][0][0] == "DQN":
-            for i in range(len(dict_policies_to_visualize[n][0][1]) // 3):
-                single_opinions_file_path = single_file_path.replace(".png", f"_n{n}_opinions_{i}.png")
-                plot_opinions_with_polarization(dict_policies_to_visualize[n][0][1], run_to_visualize=3 * i, file_path=single_opinions_file_path)
+        if dict_policies_to_visualize[single_plot_n][0][0] == "DQN":
+            for i in range(len(dict_policies_to_visualize[single_plot_n][0][1]) // 3):
+                single_opinions_file_path = single_file_path.replace(".png", f"_n{single_plot_n}_opinions_{i}.png")
+                plot_opinions_with_polarization(dict_policies_to_visualize[single_plot_n][0][1], run_to_visualize=3 * i, file_path=single_opinions_file_path)
 
 
     # save results to file
@@ -501,11 +541,11 @@ def plot_opinions_with_polarization(recorded_opinions_array, run_to_visualize=0,
     ax1.tick_params(axis='y', labelcolor='gray', labelsize=14)
     ax1.tick_params(axis='x', labelcolor='black', labelsize=14)
 
-    # ax2 = ax1.twinx()
-    # ax2.plot(np.arange(0, recorded_opinions_array.shape[1]), average_pol_no_std(recorded_opinions_array), alpha=0.8, linewidth=2.5, color='darkblue')
-    # ax2.set_ylim(0, 130)
-    # ax2.set_yticks((0, 25, 50, 75, 100, 125))
-    # ax2.tick_params(axis='y', labelcolor='darkblue', labelsize=14)
+    ax2 = ax1.twinx()
+    ax2.plot(np.arange(0, recorded_opinions_array.shape[1]), average_pol_no_std(recorded_opinions_array), alpha=0.8, linewidth=2.5, color='darkblue')
+    ax2.set_ylim(0, 130)
+    ax2.set_yticks((0, 25, 50, 75, 100, 125))
+    ax2.tick_params(axis='y', labelcolor='darkblue', labelsize=14)
     if file_path:
         plt.savefig(file_path)
     plt.close()

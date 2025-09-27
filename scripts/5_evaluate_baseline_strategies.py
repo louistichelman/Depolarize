@@ -1,4 +1,28 @@
 #!/usr/bin/env python3
+"""
+Evaluate Baseline Strategies for NL-OnDP
+---------------------------------------------------
+
+This script computes and evaluates baseline strategies in the nonlinear
+opinion dynamics environment. It performs the following steps:
+
+1. Load validation or test states generated beforehand.
+2. Run baseline strategies (no intervention, minmax, soft minmax, deleting)
+   on these states over a fixed number of simulation steps.
+3. Save the recorded opinions and graph metrics for each baseline.
+4. Visualize polarization development over time, comparing the baselines.
+
+Usage:
+--n_values: List of graph sizes (n) to evaluate (default: [100, 200, 300, 400]) (must match generated states)
+--n_steps: Number of simulation steps to run for each state (default: 20000) (steps/2 equals time horizon T, since one steps chooses one endnode)
+--folder: Folder containing the states to evaluate (`val` or `test`, default: `val`)
+--average_degree: Average degree of the network (default: 6) (must match generated states)
+--n_edge_updates_per_step: Number of edge updates in nonlinear opinion dynamics (default: 5)
+
+Results are stored in the `data/nonlinear/baselines` directory.
+"""
+
+
 import argparse
 import sys
 from pathlib import Path
@@ -44,8 +68,8 @@ def main():
     parser.add_argument(
         "--n_edge_updates_per_step",
         type=int,
-        default=5,
-        help="Number of edge updates in nonlinear opinion dynamics (only relevant for NL-DepolarizeOnline).",
+        default=4,
+        help="Number of edge updates in nonlinear opinion dynamics.",
     )
     parser.add_argument(
         "--n_steps",

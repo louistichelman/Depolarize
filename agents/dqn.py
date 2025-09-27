@@ -1,3 +1,28 @@
+"""
+Deep Q-Network (DQN) Implementation
+-----------------------------------
+
+This module implements a Deep Q-Network agent for the depolarization problem
+(both offline and online settings). The agent uses a Graph Neural Network (GNN)
+backbone to represent graph-structured states and estimate Q-values for actions.
+
+Main components:
+- DQN class: core agent with training, evaluation, and policy inference methods.
+- SimpleReplayBuffer: experience replay buffer for learning.
+
+The agent supports:
+- Multiple GNN backbones (GraphSage, GraphormerGD, GCN, GlobalMP)
+- Different Q-network approaches (DP, CE)
+- Training with parallel environments
+- Flexible epsilon-greedy exploration scheduling
+- Logging with Weights & Biases (wandb)
+- Optional opinion recording during training (for NL-OnDP experiments)
+- Customizable TD loss computation (single edge addition or episodic)
+- Random resetting of non-episodic environments during training
+"""
+
+
+
 import os
 import torch
 import numpy as np
@@ -18,26 +43,49 @@ class DQN:
     Deep Q-Network (DQN) agent for training for Offline and Online Depolarization Problem.
     Uses a GNN as underlying architecture for the Q-network.
 
-    Arguments:
-    - env: environment instance (BaseEnv) (FJ dynamics or nonlinear model)
+    Parameters
+    ----------
+    env : BaseEnv, optional
+        The environment instance (FJ dynamics or nonlinear model).
         If None, the agent can only be used for evaluation.
-    - gnn: name of the GNN architecture to use (possible values: GraphSage, GraphormerGD, GCN, GlobalMP)
-    - qnet: name of the Q-network approach to use (possible values: DP, CE)
-    - device: torch device (default: cuda if available, else cpu)
-    - learning_rate: learning rate for the Adam optimizer (default: 0.0004)
-    - gamma: discount factor (default: 1.0)
-    - batch_size: batch size for training (default: 64)
-    - train_freq: frequency (in steps) of training the Q-network (default: 4)
-    - target_update_freq: frequency (in steps) of updating the target network (default: 1000)
-    - timesteps_train: total number of training steps (default: 100000)
-    - wandb_init: whether to initialize a Weights & Biases run (default: True)
-    - start_e: starting value of epsilon for epsilon-greedy exploration (default: 1.0)
-    - end_e: final value of epsilon for epsilon-greedy exploration (default: 1.0, i.e., no exploration)
-    - reset_probability: for non-episodic environments, the probability of resetting the environment at each step (default: None)
-    - parallel_envs: number of parallel environment instances to use (default: 1)
-    - td_loss_one_edge: whether to compute the TD loss as if only one edge is added per step (default: False)
-    - record_opinions_while_training: whether to record the opinions at each step during training (default: False)
-        If True, the opinions are saved in a numpy file in results/dqn/nonlinear/runs/<run_name>/opinions_during_training
+    gnn : str, default="GraphSage"
+        The name of the GNN architecture to use. 
+        Possible values: {"GraphSage", "GraphormerGD", "GCN", "GlobalMP"}.
+    qnet : str, default="CE"
+        The name of the Q-network approach to use.
+        Possible values: {"DP", "CE"}.
+    device : torch.device, optional
+        Torch device to use (default: CUDA if available, otherwise CPU).
+    learning_rate : float, default=0.0004
+        Learning rate for the Adam optimizer.
+    gamma : float, default=1.0
+        Discount factor for Q-learning.
+    batch_size : int, default=64
+        Batch size used for training.
+    train_freq : int, default=4
+        Frequency (in steps) of training the Q-network.
+    target_update_freq : int, default=1000
+        Frequency (in steps) of updating the target network.
+    timesteps_train : int, default=100000
+        Total number of training steps.
+    wandb_init : bool, default=True
+        Whether to initialize a Weights & Biases run for logging.
+    start_e : float, default=1.0
+        Starting value of epsilon for epsilon-greedy exploration.
+    end_e : float, default=1.0
+        Final value of epsilon for epsilon-greedy exploration
+        (default keeps epsilon constant, i.e. no exploration decay).
+    reset_probability : float, optional
+        For non-episodic environments, the probability of resetting 
+        the environment at each step.
+    parallel_envs : int, default=1
+        Number of parallel environment instances to use.
+    td_loss_one_edge : bool, default=False
+        Whether to compute the TD loss as if only one edge is added per episode.
+    record_opinions_while_training : bool, default=False
+        Whether to record the opinions at each step during training.
+        If True, the opinions are saved in a numpy file at:
+        ``results/dqn/nonlinear/runs/<run_name>/opinions_during_training``.
     """
 
     def __init__(

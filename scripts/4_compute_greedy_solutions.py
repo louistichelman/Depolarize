@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Greedy Baseline for FJ-OffDP
 --------------------------------
@@ -20,9 +21,6 @@ Usage:
 --folder: Folder containing the start states (`val` or `test`, default: `test`)
 --average_degree: Average degree of the graphs to consider (default: 6) (must match generated states)
 """
-
-
-#!/usr/bin/env python3
 import os
 import sys
 from pathlib import Path
