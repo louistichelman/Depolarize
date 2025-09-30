@@ -2,8 +2,8 @@
 FJOpinionDynamics Environment
 -----------------------------
 
-This file defines the FJOpinionDynamics environment, an implementation of the
-Friedkin–Johnsen (FJ) opinion dynamics model as a Markov Decision Process (MDP).
+This file defines the FJOpinionDynamics environment, an implementation of the Offline Depolarization Problem (OffDP) using the
+Friedkin–Johnsen (FJ) opinion dynamics model as a Markov Decision Process (MDP) (see Chapter 5.2/3 in the thesis).
 
 Key features:
 - Represents states as dictionaries containing graph structure, opinions,
@@ -11,7 +11,7 @@ Key features:
 - Supports both randomly initialized states (Watts–Strogatz graphs + random opinions)
   and pre-saved start states loaded from disk.
 - Provides reset, step, and terminal condition methods to interact with the environment.
-- Computes polarization based on the FJ model, with optional resistance matrix support.
+- Computes polarization based on the FJ model.
 
 This environment is used for training and evaluating reinforcement learning
 agents (e.g., DQN with GNNs) in the Offline Depolarization Problem (OffDP).
@@ -32,14 +32,16 @@ from ..base_env import BaseEnv
 class FJOpinionDynamics(BaseEnv):
     """
     Environment for optimizing polarization reduction under the FJ opinion dynamics model.
-    This environment does not generate all unique states
+    This environment does not generate all unique states like FJOpinionDynamicsFinite,
+    but rather samples random states (graphs + opinion vectors) on reset, or loads
+    pre-saved start states from a file.
 
     The state is represented as a dictionary with keys:
     - 'graph': the current graph (networkx.Graph)
     - 'sigma': the current opinions of the nodes (list of floats)
     - 'tau': the node that is currently being considered for rewiring (or None) (int or None)
-    - 'edges_left': the number of edges that can still be added (int)
-    - 'polarization': the current polarization of the network (float)
+    - 'edges_left': the number of edges that can still be added in the episode (int)
+    - 'polarization': the current steady state polarization of the network under FJ (float)
     - 'influence_matrix': the fundamental matrix of the network (numpy.ndarray)
     - 'graph_data': the graph data in PyTorch Geometric format (torch_geometric.utils.data.Data)
 
@@ -50,13 +52,14 @@ class FJOpinionDynamics(BaseEnv):
     start_states : str, optional
         Path to a file containing pre-saved start states. If provided, n is ignored.
     average_degree : int, optional
-        Average degree of the generated Watts-Strogatz graph (default: 6).
+        Average degree of the generated Watts-Strogatz graph (default: 6). Ignored if start_states is provided.
+    rewire_prob : float, optional
+        Rewiring probability for the Watts-Strogatz graph (default: 0.1). Ignored if start_states is provided.
     k : int, optional
         Number of edge modifications allowed (budget). Default is n // 10.
     keep_resistance_matrix : bool, optional
-        If True, the resistance matrix is kept in the influence_matrix field, used for training Graphormer-GD.
+        If True, the resistance matrix is kept in the influence_matrix field instead of fundamental matrix, used for training Graphormer-GD.
         Default is False.
-    **kwargs : additional keyword arguments
 
     """
 
@@ -71,6 +74,7 @@ class FJOpinionDynamics(BaseEnv):
             raise ValueError("Either 'n' or 'start_states' must be provided.")
 
         self.average_degree = kwargs.get("average_degree", 6)
+        self.rewire_prob = kwargs.get("rewire_prob", 0.1)
         self.k = kwargs.get("k", self.n // 10)
 
         self.keep_resistance_matrix = kwargs.get("keep_resistance_matrix", False)
@@ -97,7 +101,7 @@ class FJOpinionDynamics(BaseEnv):
             self.current_state["edges_left"] = self.k
             return self.current_state.copy()
 
-        G = nx.watts_strogatz_graph(self.n, k=self.average_degree, p=0.1)
+        G = nx.watts_strogatz_graph(self.n, k=self.average_degree, p=self.rewire_prob)
         sigma = np.random.uniform(-1, 1, size=self.n)
 
         polarization, influence_matrix = self.polarization(

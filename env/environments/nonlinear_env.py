@@ -86,6 +86,7 @@ class NLOpinionDynamics(BaseEnv):
         else:
             raise ValueError("Either 'n' or 'start_states' must be provided.")
         self.average_degree = kwargs.get("average_degree", 6)
+        self.rewire_prob = kwargs.get("rewire_prob", 0.1)
         self.n_edge_updates_per_step = kwargs.get(
             "n_edge_updates_per_step", self.n // 40
         )

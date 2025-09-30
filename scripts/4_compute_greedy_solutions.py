@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Greedy Baseline for FJ-OffDP
---------------------------------
+Greedy Baseline Computation for FJ-OffDP
+--------------------------------------
 
 This script computes greedy baseline solutions for the Friedkin–Johnsen
 offline depolarization problem (FJ-OffDP).
@@ -9,17 +9,17 @@ offline depolarization problem (FJ-OffDP).
 Workflow:
 1. Loads start states (generated via `3_make_dataset.py`) from the specified
    folder (`val`, or `test`).
-2. Applies the greedy edge modification algorithm for each state and
-   each specified intervention budget k.
+2. Applies the FJ Greedy Depolarize algorithm for each state and
+   each specified intervention budget k. (Chapter 3.3 in the thesis.)
 3. Saves the resulting graphs and polarization scores to
    `data/friedkin-johnson/greedy_solutions`.
 
 Usage:
-
---n_values: List of graph sizes (n) to process (default: [50, 100, 150]) (must match generated states)
---k_values: List of intervention budgets (k) to process (default: [1, 2, 3, 4, 5])
+--n_values: List of graph sizes (n) to process (default: [100, 150, 200, 300, 400]) (must match generated test/val states)
+--k_values: List of intervention budgets (k) to process (default: [5, 10, 15, 20])
 --folder: Folder containing the start states (`val` or `test`, default: `test`)
---average_degree: Average degree of the graphs to consider (default: 6) (must match generated states)
+--average_degree: Average degree of the graphs to consider (default: 6) (must match generated test/val states)
+
 """
 import os
 import sys
@@ -85,7 +85,7 @@ def main():
         "--n_values",
         type=int,
         nargs="+",
-        default=[50, 100, 150],
+        default=[100, 150, 200, 300, 400],
         help="List of n values for which to compute solutions.",
     )
     parser.add_argument(
@@ -98,7 +98,7 @@ def main():
         "--k_values",
         type=int,
         nargs="+",
-        default=[1, 2, 3, 4, 5],
+        default=[5, 10, 15, 20],
         help="List of k values for which to compute solutions.",
     )
     parser.add_argument(

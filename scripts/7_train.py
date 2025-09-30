@@ -16,22 +16,51 @@ After training, the script automatically evaluates the learned policies
 on validation or test sets, computes baseline comparisons, and generates
 visualizations of performance and action strategies.
 
-Typical workflow:
-- Train a new agent with specified parameters.
-- Optionally continue training if more timesteps are desired.
-- Optionally rerun training to compare multiple independent runs.
-- Evaluate and visualize results for both FJ and nonlinear settings.
-
 Usage
 -----
-Initial training:
-    python train_dqn.py --environment nonlinear --n 150 --timesteps_train 300000
+For initial training:
+--environment: "friedkin-johnson" or "nonlinear" (default: "friedkin-johnson")
+--n: Number of nodes in the graph during training (default: 100) (must match generated states for that environment)
+--average_degree: Average degree of the graph during training (default: 6) (must match generated states for that environment)
+--k: Number of edges to change (only relevant for FJ-Depolarize, default: 15)
+--n_edge_updates_per_step: Number of edge updates in nonlinear opinion dynamics (only relevant for NL-DepolarizeOnline, default: 5)
+--keep_resistance_matrix: Whether to keep the resistance matrix instead of the fundamental matrix (only relevant for Graphormer, default: False)
+--keep_influence_matrix: Whether to keep the influence matrix (needed for Graphormer) (in fj environment is automatically true, for nl this must be set to true if using Graphormer, default: False)
+--use_diverse_start_states: Whether to use diverse start states for training (default: False) (only relevant for NL-DepolarizeOnline, Training Method 1 in Chapter 5.4)
+--wandb_init: Whether to initialize wandb for logging (default: False)
+--gnn: Type of GNN to use ("GlobalMP", "GraphSage", "GraphormerGD", "GCN", default: "GraphSage")
+--qnet: Type of Q-network to use ("DP" or "CE", default: "DP")
+--learning_rate: Learning rate for the agent (default: 0.0004)
+--embed_dim: Embedding dimension for the GNN (default: 128)
+--num_layers: Number of layers in the GNN (default: 4)
+--batch_size: Batch size for training (default: 64)
+--gamma: Discount factor for DQN (default: 1.0)
+--num_heads: Number of attention heads (for Graphormer, default: 4)
+--reset_probability: Probability to reset environment randomly after every interaction (optional, default: None)
+--parallel_envs: Number of parallel environments (default: 1) (used for Training Method 2 in Chapter 5.4)
+--train_freq: Number of interactions after which to train the model (default is every 4 steps)
+--end_e: End epsilon for exploration (default: 1.0)
+--target_update_freq: Frequency of target network updates (default: 100000)
+--timesteps_train: Number of overall interactions (default: 300000) (Note: timesteps_train / train_freq gives the number of training steps)
+--td_loss_one_edge: Whether to compute the TD loss based on the reward for adding one edge (instead of the full episode, default: False)
+--record_opinions_while_training: Whether to record opinions while training (default: False) (used for experiment in Chapter 5.5)
+--n_values: List of n values for which to evaluate (default: [100, 150, 200, 300, 400]) (must match generated test/val states for that environment and computed greedy solutions for FJ-Depolarize or baseline strategies for NL-DepolarizeOnline)
+--k_values: List of k values for which to evaluate (only relevant for FJ-Depolarize, default: [10, 15, 20, 25, 30]) (must match computed greedy solutions)
+--folder: Folder of states to evaluate ("val" or "test", default is "val")
 
-Continue training:
-    (uncomment and call `continue_training(run_name, timesteps_train)` inside main)
+For continuing training:
+--run_name: Name of the run to continue training (required)
+--timesteps_train: Number of additional timesteps to train (default: 300000)
+--n_values: List of n values for which to evaluate (default: [100, 150, 200, 300, 400]) (must match generated test/val states for that environment and computed greedy solutions for FJ-Depolarize or baseline strategies for NL-DepolarizeOnline)
+--k_values: List of k values for which to evaluate (only relevant for FJ-Depolarize, default: [10, 15, 20, 25, 30]) (must match computed greedy solutions)
+--folder: Folder of states to evaluate ("val" or "test", default is "val")
 
-Rerun training:
-    python train_dqn.py --run_name <existing_run_name> --number_of_reruns 3
+For rerunning training:
+--run_name: Name of the run to rerun (required)
+--number_of_reruns: Number of reruns to perform (default: 1)
+--n_values: List of n values for which to evaluate (default: [100, 150, 200, 300, 400]) (must match generated test/val states for that environment and computed greedy solutions for FJ-Depolarize or baseline strategies for NL-DepolarizeOnline)
+--k_values: List of k values for which to evaluate (only relevant for FJ-Depolarize, default: [10, 15, 20, 25, 30]) (must match computed greedy solutions)
+--folder: Folder of states to evaluate ("val" or "test", default is "val")
 """
 
 import argparse
@@ -61,7 +90,7 @@ from visualization import (
 )
 
 
-def run_training(params_env, params_agent):
+def run_training(params_env: dict, params_agent: dict):
 
     env = ENVIRONMENT_REGISTRY[params_env["environment"]](**params_env)
 
@@ -98,7 +127,7 @@ def run_training(params_env, params_agent):
         return agent.run_name
 
 
-def continue_training(run_name, timesteps_train):
+def continue_training(run_name: str, timesteps_train: int):
 
     # Find directory of run
     if os.path.exists(
@@ -161,7 +190,7 @@ def continue_training(run_name, timesteps_train):
         return agent.run_name
 
 
-def rerun_training(run_name, number_of_reruns=1):
+def rerun_training(run_name: str, number_of_reruns: int = 1):
 
     # Find directory of run
     if os.path.exists(
@@ -211,7 +240,7 @@ def rerun_training(run_name, number_of_reruns=1):
         )
 
 
-def evaluate_run_fj_depolarize(run_name, n_values, k_values, n, k, folder="val"):
+def evaluate_run_fj_depolarize(run_name: str, n_values: list, k_values: list, n: int, k: int, folder: str = "val"):
     evaluate_dqn_policy_vs_greedy_ood_n(
         run_name=run_name,
         n_values=n_values,
@@ -225,7 +254,7 @@ def evaluate_run_fj_depolarize(run_name, n_values, k_values, n, k, folder="val")
     visualize_variance_ood_n(run_name, folder=folder)
 
 
-def evaluate_run_nonlinear(run_name, n_values, n_steps=20000, folder="val"):
+def evaluate_run_nonlinear(run_name: str, n_values: list, n_steps: int = 20000, folder: str = "val"):
     test_and_save_policy_dqn(run_name, n_values, n_steps=n_steps, folder=folder)
     visualize_polarization_development_dqn_and_baselines(
         run_name=run_name, folder=folder
@@ -302,15 +331,15 @@ def main():
     parser.add_argument(
         "--gnn",
         type=str,
-        choices=["Global", "GraphSage", "Graphormer", "GCN"],
+        choices=["GlobalMP", "GraphSage", "GraphormerGD", "GCN"],
         default="GraphSage",
         help="Type of GNN to use.",
     )
     parser.add_argument(
         "--qnet",
         type=str,
-        choices=["simple", "complex"],
-        default="complex",
+        choices=["DP", "CE"],
+        default="DP",
         help="Type of Q-network to use.",
     )
     parser.add_argument(

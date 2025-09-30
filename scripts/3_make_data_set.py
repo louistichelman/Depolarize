@@ -3,10 +3,9 @@
 Dataset Generation for DQN Experiments
 --------------------------------------
 
-This script generates training, validation, and test start states for 
-depolarization experiments under either:
-    - The FJ-OffDP, FJOpinionDynamics environment
-    - The NL-OnDP, NonlinearOpinionDynamics environment
+This script generates training, validation, and test start states for either:
+    - FJOpinionDynamics environment (FJ-OffDP)
+    - NonlinearOpinionDynamics environment (NL-OnDP)
 
 Functionality:
 - Uses the environment registry (ENVIRONMENT_REGISTRY) to instantiate the chosen env.
@@ -26,7 +25,8 @@ Dataset structure:
 Usage:
 --env: Environment type ("friedkin-johnson" or "nonlinear").
 --n: Graph size for in-distribution datasets.
---average_degree: Average degree of generated graphs.
+--average_degree: Average degree of generated graphs. (both use Watts-Strogatz) (default: 6)
+--rewire_prob: Rewiring probability for Watts-Strogatz graph. (default: 0.1)
 --n_train: Number of training states to generate.
 --n_val: Number of validation states to generate.
 --n_test: Number of testing states to generate.
@@ -91,6 +91,13 @@ def main():
         type=int,
         default=6,
         help="Average degree of the graph",
+    )
+
+    parser.add_argument(
+        "--rewire_prob",
+        type=float,
+        default=0.1,
+        help="Rewiring probability for Watts-Strogatz graph",
     )
 
     # train-val-test split parameters

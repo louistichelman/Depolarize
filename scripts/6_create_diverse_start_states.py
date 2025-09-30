@@ -7,7 +7,7 @@ Generate Enhanced Training States for NL-OnDP (Training Method 1)
 This script augments the training dataset for nonlinear opinion dynamics (NL-OnDP)
 by creating *diverse start states*. Instead of only using the original training
 graphs, the script simulates opinion dynamics for a number of steps and
-records states at specified time offsets.
+records states at specified time offsets. (Training Method 1 in Chapter 5.4)
 
 Workflow:
 1. Load the original training start states.
