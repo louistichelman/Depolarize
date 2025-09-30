@@ -1,10 +1,6 @@
 wandb
 **/__pycache__/
 *.pyc
-experiments_dp.ipynb
-experiments_dqn.ipynb
-old
-old_stuff
 .DS_Store
 logdir
 results
