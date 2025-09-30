@@ -395,7 +395,7 @@ def main():
     parser.add_argument(
         "--timesteps_train",
         type=int,
-        default=300000,
+        default=None,
         help="Number of timesteps to train.",
     )
 
@@ -451,65 +451,61 @@ def main():
     args = parser.parse_args()
 
     if args.run_name is not None:
-        rerun_training(args.run_name, args.number_of_reruns)
-        if args.environment == "friedkin-johnson":
-            evaluate_run_fj_depolarize(
-                run_name=args.run_name,
-                n_values=args.n_values,
-                k_values=args.k_values,
-                n=args.n,
-                k=args.k,
-                folder=args.folder,
+        if args.timesteps_train is not None:
+            # continue training
+            run_name = continue_training(
+                run_name=args.run_name, timesteps_train=args.timesteps_train
             )
-        return
-    
-    diverse_start_states_string = ""
-    if args.use_diverse_start_states:
-        diverse_start_states_string = "_diverse"
+        else:
+            # rerun training
+            rerun_training(args.run_name, args.number_of_reruns)
+            run_name = args.run_name
+    else:
+        diverse_start_states_string = ""
+        if args.use_diverse_start_states:
+            diverse_start_states_string = "_diverse"
 
-    params_env = {
-        "environment": args.environment,
-        "start_states": os.path.join(
-            "data",
-            args.environment,
-            "train",
-            f"start_states{diverse_start_states_string}_train_n{args.n}_d{args.average_degree}.pt",
-        ),
-        "n": args.n,
-        "average_degree": args.average_degree,
-        "n_edge_updates_per_step": args.n_edge_updates_per_step,
-        "keep_resistance_matrix": args.keep_resistance_matrix,
-        "keep_influence_matrix": args.keep_influence_matrix,
-        "k": args.k,
-    }
+        params_env = {
+            "environment": args.environment,
+            "start_states": os.path.join(
+                "data",
+                args.environment,
+                "train",
+                f"start_states{diverse_start_states_string}_train_n{args.n}_d{args.average_degree}.pt",
+            ),
+            "n": args.n,
+            "average_degree": args.average_degree,
+            "n_edge_updates_per_step": args.n_edge_updates_per_step,
+            "keep_resistance_matrix": args.keep_resistance_matrix,
+            "keep_influence_matrix": args.keep_influence_matrix,
+            "k": args.k,
+        }
 
-    params_agent = {
-        "gnn": args.gnn,
-        "qnet": args.qnet,
-        "learning_rate": args.learning_rate,
-        "td_loss_one_edge": args.td_loss_one_edge,
-        "embed_dim": args.embed_dim,
-        "num_layers": args.num_layers,
-        "batch_size": args.batch_size,
-        "gamma": args.gamma,
-        "num_heads": args.num_heads,
-        "wandb_init": args.wandb_init,
-        "reset_probability": args.reset_probability,
-        "parallel_envs": args.parallel_envs,
-        "end_e": args.end_e,
-        "train_freq": args.train_freq,
-        "target_update_freq": args.target_update_freq,
-        "timesteps_train": args.timesteps_train,
-        "record_opinions_while_training": args.record_opinions_while_training,
-    }
+        params_agent = {
+            "gnn": args.gnn,
+            "qnet": args.qnet,
+            "learning_rate": args.learning_rate,
+            "td_loss_one_edge": args.td_loss_one_edge,
+            "embed_dim": args.embed_dim,
+            "num_layers": args.num_layers,
+            "batch_size": args.batch_size,
+            "gamma": args.gamma,
+            "num_heads": args.num_heads,
+            "wandb_init": args.wandb_init,
+            "reset_probability": args.reset_probability,
+            "parallel_envs": args.parallel_envs,
+            "end_e": args.end_e,
+            "train_freq": args.train_freq,
+            "target_update_freq": args.target_update_freq,
+            "timesteps_train": args.timesteps_train,
+            "record_opinions_while_training": args.record_opinions_while_training,
+        }
 
-    # Run training
-    # run_name = run_training(params_env=params_env, params_agent=params_agent)
-    run_name = "GraphSage-complex-n150-k0-hd128-layers4-lr0.0001-heads0-bs64-p1-g0.8-tuf4000-SRLWZ"
-    # visualize_variance_ood_n_simple(run_name, folder=args.folder)
-    # continue_training(run_name=run_name, timesteps_train=args.timesteps_train)
-    if args.number_of_reruns is not None:
-        rerun_training(run_name=run_name, number_of_reruns=args.number_of_reruns)
+        # Run training
+        run_name = run_training(params_env=params_env, params_agent=params_agent)
+        if args.number_of_reruns is not None:
+            rerun_training(run_name=run_name, number_of_reruns=args.number_of_reruns)
+
     if args.environment == "friedkin-johnson":
         # Evaluate and visualize results
         evaluate_run_fj_depolarize(
