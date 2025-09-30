@@ -3,8 +3,8 @@
 Evaluate Baseline Strategies for NL-OnDP
 ---------------------------------------------------
 
-This script computes and evaluates baseline strategies in the nonlinear
-opinion dynamics environment. It performs the following steps:
+This script computes and evaluates baseline strategies in the depolarizing the nonlinear
+opinion dynamics environment (see Chapter 4.2). It performs the following steps:
 
 1. Load validation or test states generated beforehand.
 2. Run baseline strategies (no intervention, minmax, soft minmax, deleting)
@@ -17,7 +17,7 @@ Usage:
 --n_steps: Number of simulation steps to run for each state (default: 20000) (steps/2 equals time horizon T, since one steps chooses one endnode)
 --folder: Folder containing the states to evaluate (`val` or `test`, default: `val`)
 --average_degree: Average degree of the network (default: 6) (must match generated states)
---n_edge_updates_per_step: Number of edge updates in nonlinear opinion dynamics (default: 5)
+--n_edge_updates_per_step: Number of edge updates in nonlinear opinion dynamics (default: 4)
 
 Results are stored in the `data/nonlinear/baselines` directory.
 """

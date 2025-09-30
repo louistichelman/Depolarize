@@ -21,7 +21,7 @@ The code supports the following experiments:
   Non-deep RL methods (dynamic programming and tabular Q-learning) for solving FJ-OffDP.
 
 - **Deep RL approaches (Chapters 5.3 & 5.4):**  
-  DQN agents with graph neural networks (GraphSAGE, Graphormer, etc.) for both FJ-OffDP and NL-OnDP.
+  DQN agent with graph neural networks (GraphSAGE, Graphormer, etc.) for both FJ-OffDP and NL-OnDP.
 
 ---
 
@@ -205,6 +205,7 @@ python scripts/7_train.py \
 
 Trained models and evaluations are saved under `results/dqn/nonlinear/runs/<run_name>`. Again, training can be continued or rerun as described in 4(iv).
 
+---
 
 ## Repository Structure
 
